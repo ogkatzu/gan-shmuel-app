@@ -5,20 +5,29 @@ import json
 from datetime import datetime
 from sqlalchemy import text
 
-from auxillary_functions import transaction_to_dict, create_session_id, create_transaction_from_data_and_session_id, insert_transaction
+from auxillary_functions import transaction_to_dict, create_session_id, create_transaction_from_data_and_session_id, insert_transaction, in_json_and_extras_to_transaciotn
 
-      
+def insert_transaction(new_transaction, exists: bool):
+    if exists:
+        # Fetch and update the existing object
+        tx = Transaction.query.get(new_transaction.id)
+        tx.bruto = new_transaction.bruto
+    else:
+        db.session.add(new_transaction)
+
+    db.session.commit()
+
 class truck_direction():
 
     def truck_in(data: json):
         session_id = create_session_id(data['datetime'])
         already_exists = False
-        if data['prev_record']['directiom'] == 'in':
-            if not data['force']:
-                return 400, 'Bad Request'
-            else:
-                if data['prev_record']['truck'] != data['truck']:
-                    return 400, 'Bad Request' # better text
+        if data['prev_record']:
+            if data['prev_record']['directiom'] == 'in':
+                if not data['force']:
+                    return 400, 'Bad Request'
+                elif data['prev_record']['truck'] != data['truck']:
+                        return 400, 'Bad Request' # better text
                 else:
                     session_id = data['prev_record']['session_id']
                     already_exists = True
@@ -47,10 +56,11 @@ class truck_direction():
             else:
                 containers_tara = 'NA'
                 break
-        nete = bruto - truck_tara - containers_tara
-
-
-            
+        neto = bruto - truck_tara - containers_tara
+        new_transaction = in_json_and_extras_to_transaciotn(in_json=entrance, truck_tara=truck_tara, neto=neto, exact_time=data['datetime'])
+        db.session.add(new_transaction)
+        ret = {"id": new_transaction.id, "truck": new_transaction.truck, "bruto": new_transaction.bruto, "truckTara": new_transaction.truckTara, "neto": new_transaction.neto}
+        return ret
 
 
 
@@ -133,7 +143,8 @@ def health():
 def post_weight(self):
     data = request.json()
     prev_record = db.session.query(Transaction).filter(Transaction.truck == data['truck']).order_by(Transaction.datetime.desc()).first()
-    data['prev_record'] = transaction_to_dict(prev_record)
+    if prev_record:
+        data['prev_record'] = transaction_to_dict(prev_record)
     if data['unit'] == 'lb' and isinstance(data['weight'], int) :
         weight_in_kg = int(data['weight'] /  2.205)
         data['unit'] = 'kg'
