@@ -56,7 +56,7 @@ def run_and_build_environment(repo_url):
         print("Repository already exists. Fetching latest changes...")
         subprocess.run(['git', '-C', repo_dir, 'fetch'], check=True)
 
-    subprocess.run(['bash', 'build-deploy.sh'], check=True)
+    subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yml', 'up'], check=True)
 
 
 if __name__ == '__main__':
