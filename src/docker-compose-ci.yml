@@ -1,0 +1,19 @@
+
+services:
+  ci-runner:
+    image: docker:28.1.1-cli
+    container_name: ci-runner
+    ports:
+      - "5050:5050"
+    working_dir: /app/gan-shmuel
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Optionally mount your project directory or scripts
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    command: >
+      sh -c "python3 --version || exit 1"
+
+
+# Optionally, you can add other services or networks as needed.
+ 
