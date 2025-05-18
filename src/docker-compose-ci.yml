@@ -17,5 +17,4 @@ services:
       source venv/bin/activate &&
       pip install -r requirements.txt &&
       python3 webhook.py"
-# Optionally, you can add other services or networks as needed.
  
