@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  weight_app:
+    build:
+      context: ./weight
+    container_name: weight-app 
+    ports:
+      - "8082:5000"
+    depends_on:
+      weight_db:
+       condition: service_healthy
+    volumes:
+      - ./weight/src:/weight_app
+      - ./weight/in:/weight/in
+    env_file:
+      - ./weight/env
+    networks:
+      - mynet
+
+  weight_db:
+    image: mysql:8
+    container_name: weight-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ./weight/weightdb.sql:/docker-entrypoint-initdb.d/weightdb.sql  # Mount the SQL file
+      - ./weight/db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    
+    networks:
+      - mynet
+
+  billing-app:
+    build:
+      context: ./billing
+    container_name: billing-app
+    environment:
+      - FLASK_ENV=development
+    ports:
+      - "8083:5001"
+    networks:
+      - mynet
+    depends_on:
+      - billing-db
+
+  billing-db:
+    image: mysql:8
+    container_name: billing-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: billdb
+    volumes:
+      - ./billing/mysql-db/nillingdb.sql:/docker-entrypoint-initdb.d/nillingdb.sql
+      - ./billing/db_data:/var/lib/mysql
+
+    ports:
+      - "8084:3306"
+    networks:
+      - mynet
+
+networks:
+  mynet:
+    driver: bridge
+
