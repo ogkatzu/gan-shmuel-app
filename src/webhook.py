@@ -2,6 +2,7 @@ from flask import Flask, request, abort
 import hmac
 import hashlib
 import os
+import subprocess
 
 app = Flask(__name__)
 
@@ -30,12 +31,34 @@ def github_webhook():
         abort(401, 'Signature verification failed')
 
     event = request.headers.get('X-GitHub-Event', 'ping')
+    data = request.json
 
     if event == 'pull_request':
-        return 'Pull request event processed', 200
+        action = data.get('action')
+        pull_request = data.get('pull_request', {})
+        repo_url = pull_request.get('head', {}).get('repo', {}).get('ssh_url')
+        
+        if action == 'closed':
+            run_and_build_environment(repo_url)
+            return 'Pull request is in process...', 200
+            
 
     return 'Event ignored', 200
 
+
+def run_and_build_environment(repo_url):
+    repo_dir = 'gan-shmuel-app'
+
+    if not os.path.exists(repo_dir):
+        print("Cloning repository...")
+        subprocess.run(['git', 'clone', '--branch', 'main', repo_url, repo_dir], check=True)
+    else:
+        print("Repository already exists. Fetching latest changes...")
+        subprocess.run(['git', '-C', repo_dir, 'fetch'], check=True)
+
+    subprocess.run(['bash', 'build-deploy.sh'], check=True)
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+    app.run(debug=True ,host='0.0.0.0', port=8080)
 
