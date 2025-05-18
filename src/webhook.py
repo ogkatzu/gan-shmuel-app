@@ -61,7 +61,7 @@ def github_webhook():
     repository = data.get('repository', {})
     repo_url = repository.get('clone_url')
     run_and_build_environment(repo_url)
-    
+
     return 'Pull request is in process...', 200
 
 def run_and_build_environment(repo_url):
