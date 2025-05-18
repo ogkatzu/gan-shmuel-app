@@ -3,6 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 import pymysql
 import os
 from datetime import datetime
+from sqlalchemy import text
+
 
 
 
