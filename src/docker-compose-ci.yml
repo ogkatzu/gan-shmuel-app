@@ -8,11 +8,12 @@ services:
     working_dir: /app/gan-shmuel
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./src:/app/gan-shmuel
       # Optionally mount your project directory or scripts
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
-    command: >
-      sh -c "python3 --version || exit 1"
+    command: 
+      bash -c "pip install flask && python webhook.py"
 
 
 # Optionally, you can add other services or networks as needed.
