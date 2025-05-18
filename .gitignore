@@ -1,9 +1,70 @@
-/docs
-.venv
+# Python virtual environment
+.venv/
 venv/
 env/
+
+# Test output
+.pytest_cache/
+coverage.xml
+htmlcov/
+junit.xml
+nosetests.xml
+
+# Byte-compiled / cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs and temporary files
+*.bak
+*.lock
+*.log
+*.pid
+*.tmp
+
+# Secrets and certificates
+*.key
+*.pem
+cert.*
+key.*
+container-resources/**/secret/
+container-resources/**/nginx/cert/
+
+# Editor / IDE configs
 .idea/
 .vscode/
-.env
-*.pem
+*.swo
+*.swp
+*.code-workspace
 
+# Env files
+.env
+*.env
+*.env.*
+
+# Docker artifacts
+docker-volume/
+volumes/
+data/
+*.tar
+*.img
+
+# System files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# MySQL dumps & backups
+*.sql~
+*~
+
+# Node.js / frontend
+node_modules/
+dist/
+build/
+
+# Python packaging
+*.egg
+*.egg-info/
+build/
