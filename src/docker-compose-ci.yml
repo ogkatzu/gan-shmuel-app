@@ -12,8 +12,10 @@ services:
       # Optionally mount your project directory or scripts
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
-    command: 
-      bash -c "pip install flask && python webhook.py"
+    command: >
+      sh -c "
+      apk add --no-cache python3 py3-pip git &&
+      python3 --version || exit 1"
 
 
 # Optionally, you can add other services or networks as needed.
