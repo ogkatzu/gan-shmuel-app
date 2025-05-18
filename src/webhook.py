@@ -23,31 +23,31 @@ def verify_signature(payload, signature_header):
     expected_signature = mac.hexdigest()
     return hmac.compare_digest(expected_signature, signature)
 
- """ @app.route('/webhook', methods=['POST', 'GET'])
-def github_webhook():
-    signature = request.headers.get('X-Hub-Signature-256')
-    payload = request.data
+#  @app.route('/webhook', methods=['POST', 'GET'])
+# def github_webhook():
+#     signature = request.headers.get('X-Hub-Signature-256')
+#     payload = request.data
 
-#    if not verify_signature(payload, signature):
-#        abort(401, 'Signature verification failed')
+# #    if not verify_signature(payload, signature):
+# #        abort(401, 'Signature verification failed')
 
-    event = request.headers.get('X-GitHub-Event', 'ping')
-    data = request.json
-    print(json.dumps(data, indent=2))
-    #if event == 'pull_request':
-    action = data.get('action')
-    repository = data.get('repository', {})
-    repo_url = repository.get('clone_url')
-    #pull_request = data.get('push', {})
-    #repo_url = pull_request.get('head', {}).get('repo', {}).get('clone_url')
-    print(repo_url)
-    #    if action == 'closed':
-    run_and_build_environment(repo_url)
-    return 'Pull request is in process...', 200
+#     event = request.headers.get('X-GitHub-Event', 'ping')
+#     data = request.json
+#     print(json.dumps(data, indent=2))
+#     #if event == 'pull_request':
+#     action = data.get('action')
+#     repository = data.get('repository', {})
+#     repo_url = repository.get('clone_url')
+#     #pull_request = data.get('push', {})
+#     #repo_url = pull_request.get('head', {}).get('repo', {}).get('clone_url')
+#     print(repo_url)
+#     #    if action == 'closed':
+#     run_and_build_environment(repo_url)
+#     return 'Pull request is in process...', 200
 
 
-    return 'Event ignored', 200 
- """
+#     return 'Event ignored', 200 
+ 
 
 @app.route('/webhook', methods=['GET'])
 def github_webhook():
