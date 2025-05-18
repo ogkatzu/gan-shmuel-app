@@ -1,20 +1,8 @@
-import mysql.connector
 from datetime import datetime
+from sqlalchemy import text
 
-# Function to connect to the database
-def get_db_connection():
-    try:
-        conn = mysql.connector.connect(
-            host='localhost',  
-            user='root',       
-            password='',       
-            database='weight'
-        )
-        return conn
-    except mysql.connector.Error as err:
-        print(f"Database connection error: {err}")
-        return None
-    
+
+
 
 # Function to convert a date string to the expected format  ('yyyymmddhhmmss') ==>  ('20250518143000') in object datetime
 def parse_date(date_string, default_date=None):
@@ -28,12 +16,8 @@ def parse_date(date_string, default_date=None):
    
 
 # Function to get transactions in a time range
-def get_transactions_by_time_range(from_time, to_time, directions=None):
-    conn = get_db_connection()
-    if not conn:
-        return []  #empty list if connection fails
-
-
+def get_transactions_by_time_range(db_session,Transaction_model,from_time, to_time, directions=None):  
+    
 
     # Default values
     now = datetime.now()
@@ -51,38 +35,29 @@ def get_transactions_by_time_range(from_time, to_time, directions=None):
 
 
     try:  # try/except block to handle database errors
-        cursor = conn.cursor(dictionary=True)
+
+         
         
-        # Create placeholders for SQL query
-        placeholders = ', '.join(['%s'] * len(direction_list))
-        
-        # SQL query
-        query = f"""
-        SELECT id, datetime, direction, truck, containers, bruto, neto, produce
-        FROM transactions
-        WHERE datetime BETWEEN %s AND %s
-        AND direction IN ({placeholders})
-        """
-        
-        # Execute query
-        params = [from_datetime, to_datetime] + direction_list    # [ from_datetime, to_datetime] == >  [ from_datetime, to_datetime , -- , -- ]
-        cursor.execute(query, params)   #sends the SQL query to the database , and replace each placeholder %s
         
 
+        # Query transactions matching the criteria
+        query = db_session.query(Transaction_model).filter(
+            Transaction_model.datetime.between(from_datetime, to_datetime),
+            Transaction_model.direction.in_(direction_list)
+        ).all()
 
-        ### retrieve all result rows from the executed SQL query  ###
-        # Fetch all results
-        transactions = cursor.fetchall() 
+
+
         
         # Format results
         result = []
-        for t in transactions:
+        for t in query:
             containers_list = []
             if t['containers'] and t['containers'] != 'na':  # na if some of containers have unknown tara
                 containers_list = t['containers'].split(',')
             
             transaction_obj = {
-                "id": str(t['id']),
+                "id": str(t.id),
                 "direction": t['direction'],
                 "bruto": t['bruto'],
                 "neto": t['neto'] if t['neto'] is not None else "na",
@@ -93,17 +68,11 @@ def get_transactions_by_time_range(from_time, to_time, directions=None):
                                              #     {"id": "101", ..., "containers": ["C001", "C002"]},
                                              #     {"id": "102", ..., "containers": ["C003"]},
                                              #     {"id": "103", ..., "containers": []}
-                                             # ]
-        
-        cursor.close()
-        conn.close()
-        return result
+                                             # ] 
+
+        return "result"
         
 
-
-    except mysql.connector.Error as err:
-        print(f"Error executing query: {err}")
-        if conn.is_connected():
-            cursor.close()
-            conn.close()
+    except Exception as e:
+        print(f"Error executing query: {e}")
         return []

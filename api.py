@@ -4,7 +4,7 @@ import pymysql
 import os
 from datetime import datetime
 from sqlalchemy import text
-from auxillary_functions import get_transactions_by_time_range
+import auxillary_functions 
 
 app = Flask(__name__, template_folder='templates')
 # enviromental/global vars go here
@@ -25,7 +25,7 @@ def get_weight():
     filter_directions = request.args.get('filter')
 
     #Call auxiliary function to get data
-    transactions = get_transactions_by_time_range(from_time, to_time, filter_directions)
+    transactions = auxillary_functions.get_transactions_by_time_range(db.session,Transaction,from_time, to_time, filter_directions)
 
     #Return results in JSON format
     return jsonify(transactions)
@@ -90,4 +90,4 @@ def health():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-    app.run(host="0.0.0.0", port=5000)
+    app.run(debug=True,host="0.0.0.0", port=5000)
