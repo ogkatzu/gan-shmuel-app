@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 from sqlalchemy import text
 import auxillary_functions 
+import csv ,json
 
 app = Flask(__name__, template_folder='templates')
 # enviromental/global vars go here
@@ -85,7 +86,87 @@ def health():
         return "OK", 200
 
 
-
+@app.route('/batch-weight', methods=['POST'])
+def batch_weight():
+    # Debug print to check received JSON payload
+    print('Received JSON:', request.get_json())
+    # Extract ‘file’ parameter from the JSON request body
+    filename = request.json.get('file')
+    if not filename:
+        return jsonify({'error': 'Missing file parameter'}), 400
+    # Construct the full file path
+    filepath = os.path.join('in', filename)
+    # Check if the file exists
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'File not found'}), 400
+    added = 0  # Counter for how many records were added/updated
+    try:
+        # Handle CSV file
+        if filename.endswith('.csv'):
+            with open(filepath, newline='') as csvfile:
+                reader = csv.reader(csvfile)
+                headers = next(reader, None)  # Read the header row
+                if not headers or len(headers) < 2:
+                    return jsonify({'error': 'Invalid CSV headers'}), 400
+                unit = headers[1].lower()  # Get unit from header
+                for row in reader:
+                    if len(row) < 2:
+                        continue  # Skip malformed rows
+                    cid = row[0].strip()
+                    try:
+                        w = float(row[1])
+                    except ValueError:
+                        continue  # Skip rows with invalid weight
+                    if not cid:
+                        continue  # Skip empty container ID
+                    # Check if container already exists
+                    existing = Container.query.get(cid)
+                    if existing:
+                        # Update existing container
+                        existing.weight = w
+                        existing.unit = unit
+                    else:
+                        # Create new container
+                        new = Container(container_id=cid, weight=w, unit=unit)
+                        db.session.add(new)
+                    added += 1
+        # Handle JSON file
+        elif filename.endswith('.json'):
+            with open(filepath) as jsonfile:
+                data = json.load(jsonfile)
+                if not isinstance(data, list):
+                    return jsonify({'error': 'JSON format must be a list'}), 400
+                for item in data:
+                    cid = item.get('id')
+                    w = item.get('weight')
+                    unit = item.get('unit', '').lower()
+                    # Validate required fields
+                    if not cid or w is None or not unit:
+                        continue
+                    try:
+                        w = float(w)
+                    except ValueError:
+                        continue  # Skip invalid weights
+                    # Check if container already exists
+                    existing = Container.query.get(cid)
+                    if existing:
+                        # Update existing container
+                        existing.weight = w
+                        existing.unit = unit
+                    else:
+                        # Create new container
+                        new = Container(container_id=cid, weight=w, unit=unit)
+                        db.session.add(new)
+                    added += 1
+        # Unsupported file type
+        else:
+            return jsonify({'error': 'Unsupported file format'}), 400
+        # Commit all changes to the database
+        db.session.commit()
+        return jsonify({'status': 'ok', 'added': added})
+    # Catch and return any unexpected errors
+    except Exception as e:
+        return jsonify({'error': 'An error occurred', 'details': str(e)}), 500
 
 if __name__ == "__main__":
     with app.app_context():
