@@ -1,10 +1,11 @@
-## Billing Dev Environment - team guide
+# Billing Dev Environment - team guide
 
-This environment includes a Flask API and a MySQL database,
-fully controlled via Docker Compose. Use the following aliases for fast interaction:
+- This environment includes a Flask API and a MySQL database,
+  fully controlled via Docker Compose. Use the following aliases for fast interaction:
+- each team member creates his own branch
+  e.g: feat/api-get-session-id
+- write in slack when you push changes
 
-each team member creates his own branch
-e.g: feat/api-get-session-id
 
 ---
 
