@@ -276,7 +276,7 @@ PASSWORD = "cdghvoecadvndscn"
 context = ssl.create_default_context()
 smtp_server = "smtp.gmail.com"
 sender_email = "devopsganshmuel@gmail.com"
-receiver_email = input("Type your email and press enter: ")
+receiver_email = ""
 message = """\
 Subject: Hi there
 
@@ -357,15 +357,6 @@ def verify_signature(payload, signature_header):
 #      server.ehlo()  # Can be omitted
 #      server.login(sender_email, PASSWORD)
 #      server.sendmail(sender_email, receiver_email, message)
-def cheking_docker_up():
-    print("getting the webhook http merge request")
-    print("verify signature")
-    print("checking if there is a local repo")
-    print("clone the repo now")
-    subprocess.run(['git', 'clone', '--branch', 'main', "https://github.com/ogkatzu/gan-shmuel-app.git", "gan-shmuel-app"], check=True)
-    print("running container")
-    subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yaml', 'up'], check=True)
-
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
