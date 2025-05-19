@@ -6,9 +6,7 @@
   e.g: feat/api-get-session-id
 - write in slack when you push changes
 
-
 ---
-
 
 ## Load aliases into your shell
 source scripts/env-alias-list.txt
@@ -44,3 +42,5 @@ api-test
 ## instructions:
 - full dev env for testing
 
+## Before pushing changes:
+Always run api-test and check logs/api.log to ensure there are no errors or crashes in your code.
