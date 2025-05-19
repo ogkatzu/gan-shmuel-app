@@ -102,9 +102,9 @@ def cheking_docker_up():
     print("verify signature")
     print("checking if there is a local repo")
     print("clone the repo now")
-    #subprocess.run(['git', 'clone', '--branch', 'main', "https://github.com/ogkatzu/gan-shmuel-app.git", "gan-shmuel-app"], check=True)
+    subprocess.run(['git', 'clone', '--branch', 'main', "https://github.com/ogkatzu/gan-shmuel-app.git", "gan-shmuel-app"], check=True)
     print("running container")
-    #subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yaml', 'up'], check=True)
+    subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yaml', 'up'], check=True)
 
 
 if __name__ == '__main__':
