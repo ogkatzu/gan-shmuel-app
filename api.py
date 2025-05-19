@@ -32,8 +32,10 @@ def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_tim
     return new_transaction
 
 def transaction_to_dict(transaction):
+    if not isinstance(transaction.datetime, datetime):
+        transaction.datetime = datetime.strptime(transaction.datetime, "%Y-%m-%dT%H:%M:%S")
     return {
-        'id': transaction.id,
+        'id': transaction.id,           
         'datetime': transaction.datetime.isoformat() if transaction.datetime else None,
         'direction': transaction.direction,
         'truck': transaction.truck,
@@ -69,7 +71,6 @@ def insert_transaction(new_transaction, exists: bool):
         tx.bruto = new_transaction.bruto
     else:
         db.session.add(new_transaction)
-
     db.session.commit()
 
 class truck_direction():
@@ -98,19 +99,15 @@ class truck_direction():
             
 
     def truck_out(data: json):
-        id = None
         try:
             entrance = json.loads(data['prev_record'])
         except KeyError:
             return "No in for this out", 400
-        print_debug(f"type of entrance: {type(entrance)}")
-        
         if entrance['direction'] == 'out':
             if not data['force']:
                     return 'Two outs is a row without force', 400
             elif entrance['truck'] != data['truck']:
                 return 'Bad Request', 400 # better text
-        id = entrance['id']
         bruto = entrance['bruto']
         truck_tara = data['weight']
         containers_tara = 0
@@ -124,8 +121,10 @@ class truck_direction():
                 containers_tara = 'NA'
                 break
         neto = bruto - truck_tara - containers_tara
+        id = create_session_id(data['datetime']) #this is also the id - not session id - for out
         new_transaction = in_json_and_extras_to_transaciotn(in_json=entrance, truck_tara=truck_tara, neto=neto, exact_time=data['datetime'], id=id)
         db.session.add(new_transaction)
+        db.session.commit()
         ret = {'id': new_transaction.id, 'truck': new_transaction.truck, 'bruto': new_transaction.bruto, 'truckTara': new_transaction.truckTara, 'neto': new_transaction.neto}
         return ret, 200
 
@@ -160,7 +159,7 @@ class Container(db.Model):
 class Transaction(db.Model):
     __tablename__ = 'transactions'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    datetime = db.Column(db.DateTime, default=datetime.utcnow)
+    datetime = db.Column(db.DateTime, default=datetime)
     direction = db.Column(db.String(10))
     truck = db.Column(db.String(50))
     containers = db.Column(db.String(10000))
@@ -206,7 +205,6 @@ def health():
 def post_weight():
     data = request.get_json()
     prev_record = db.session.query(Transaction).filter(Transaction.truck == data.get('truck')).order_by(Transaction.datetime.desc()).first()
-    
     if prev_record:
         prev_record = transaction_to_dict(prev_record)
         prev_record = json.dumps(prev_record)
