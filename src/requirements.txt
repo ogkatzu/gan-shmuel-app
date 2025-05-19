@@ -1,3 +1,6 @@
+aiosmtpd==1.4.6
+atpublic==6.0.1
+attrs==25.3.0
 blinker==1.9.0
 click==8.2.0
 Flask==3.1.1
