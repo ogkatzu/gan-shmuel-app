@@ -37,3 +37,6 @@ Thumbs.db
 *.swp
 *.swo
 .mypy_cache/
+
+#env
+.env
