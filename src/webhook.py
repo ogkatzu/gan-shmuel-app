@@ -16,7 +16,7 @@ PASSWORD = "cdghvoecadvndscn"
 context = ssl.create_default_context()
 smtp_server = "smtp.gmail.com"
 sender_email = "devopsganshmuel@gmail.com"
-receiver_email = input("Type your email and press enter: ")
+receiver_email = ""
 message = """\
 Subject: Hi there
 
@@ -102,10 +102,11 @@ def cheking_docker_up():
     print("verify signature")
     print("checking if there is a local repo")
     print("clone the repo now")
-    subprocess.run(['git', 'clone', '--branch', 'main', "https://github.com/ogkatzu/gan-shmuel-app.git", "gan-shmuel-app"], check=True)
+    #subprocess.run(['git', 'clone', '--branch', 'main', "https://github.com/ogkatzu/gan-shmuel-app.git", "gan-shmuel-app"], check=True)
     print("running container")
-    subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yaml', 'up'], check=True)
+    #subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yaml', 'up'], check=True)
 
 
 if __name__ == '__main__':
-    app.run(debug=True ,host='0.0.0.0', port=8080)
+    #app.run(debug=True ,host='0.0.0.0', port=8080)
+    cheking_docker_up()
