@@ -268,7 +268,8 @@ def webhook():
     is_merge_to_main = False
     is_pr = False
     is_repo_local = os.path.exists(CONFIG['repo_path'])
-    commit_id = payload["pull_request"]["head"]["sha"]
+    if payload.get('commits'):
+        commit_id = payload['commits'][-1]['author']['email']
     # Check if it's a push to main
     if 'ref' in payload and payload['ref'] == f"refs/heads/{CONFIG['main_branch']}":
         is_merge_to_main = True
