@@ -6,7 +6,6 @@ htmlcov/
 node_modules/
 dist/
 build/
-scripts/
 docker-volume/
 volumes/
 data/
