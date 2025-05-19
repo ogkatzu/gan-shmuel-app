@@ -29,6 +29,7 @@ def get_weight():
     transactions = auxillary_functions.get_transactions_by_time_range(db.session,Transaction,from_time, to_time, filter_directions)
 
     #Return results in JSON format
+    
     return jsonify(transactions)
 
 
