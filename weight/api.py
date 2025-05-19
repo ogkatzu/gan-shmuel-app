@@ -17,6 +17,7 @@ db = os.environ.get("MYSQL_DATABASE")
 app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{user}:{password}@{host}/{db}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+
 db = SQLAlchemy(app)
 @app.route('/weight', methods=['GET'])
 def get_weight():
@@ -29,7 +30,7 @@ def get_weight():
     transactions = auxillary_functions.get_transactions_by_time_range(db.session,Transaction,from_time, to_time, filter_directions)
 
     #Return results in JSON format
-    
+
     return jsonify(transactions)
 
 

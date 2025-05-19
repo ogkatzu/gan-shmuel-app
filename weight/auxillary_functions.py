@@ -27,7 +27,6 @@ def parse_date(date_string, default_date=None):
 # Function to get transactions in a time range
 def get_transactions_by_time_range(db_session,Transaction_model,from_time, to_time, directions=None):  
     
-
     # Default values
     now = datetime.now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
