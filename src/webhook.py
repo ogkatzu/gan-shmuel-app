@@ -3,6 +3,7 @@ import hmac
 import hashlib
 import os
 import subprocess
+import json
 
 app = Flask(__name__)
 
@@ -22,7 +23,33 @@ def verify_signature(payload, signature_header):
     expected_signature = mac.hexdigest()
     return hmac.compare_digest(expected_signature, signature)
 
-@app.route('/webhook', methods=['POST'])
+#  @app.route('/webhook', methods=['POST', 'GET'])
+# def github_webhook():
+#     signature = request.headers.get('X-Hub-Signature-256')
+#     payload = request.data
+
+# #    if not verify_signature(payload, signature):
+# #        abort(401, 'Signature verification failed')
+
+#     event = request.headers.get('X-GitHub-Event', 'ping')
+#     data = request.json
+#     print(json.dumps(data, indent=2))
+#     #if event == 'pull_request':
+#     action = data.get('action')
+#     repository = data.get('repository', {})
+#     repo_url = repository.get('clone_url')
+#     #pull_request = data.get('push', {})
+#     #repo_url = pull_request.get('head', {}).get('repo', {}).get('clone_url')
+#     print(repo_url)
+#     #    if action == 'closed':
+#     run_and_build_environment(repo_url)
+#     return 'Pull request is in process...', 200
+
+
+#     return 'Event ignored', 200 
+ 
+
+@app.route('/webhook', methods=['GET'])
 def github_webhook():
     signature = request.headers.get('X-Hub-Signature-256')
     payload = request.data
@@ -30,35 +57,25 @@ def github_webhook():
     if not verify_signature(payload, signature):
         abort(401, 'Signature verification failed')
 
-    event = request.headers.get('X-GitHub-Event', 'ping')
     data = request.json
+    repository = data.get('repository', {})
+    repo_url = repository.get('clone_url')
+    run_and_build_environment(repo_url)
 
-    if event == 'pull_request':
-        action = data.get('action')
-        pull_request = data.get('pull_request', {})
-        repo_url = pull_request.get('head', {}).get('repo', {}).get('ssh_url')
-        
-        if action == 'closed':
-            run_and_build_environment(repo_url)
-            return 'Pull request is in process...', 200
-            
-
-    return 'Event ignored', 200
-
+    return 'Pull request is in process...', 200
 
 def run_and_build_environment(repo_url):
     repo_dir = 'gan-shmuel-app'
 
     if not os.path.exists(repo_dir):
         print("Cloning repository...")
-        subprocess.run(['git', 'clone', '--branch', 'main', repo_url, repo_dir], check=True)
+        subprocess.run(['git', 'clone', '--branch', 'main', str(repo_url), repo_dir], check=True)
     else:
         print("Repository already exists. Fetching latest changes...")
         subprocess.run(['git', '-C', repo_dir, 'fetch'], check=True)
 
-    subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yml', 'up'], check=True)
+    subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yaml', 'up'], check=True)
 
 
 if __name__ == '__main__':
     app.run(debug=True ,host='0.0.0.0', port=8080)
-
