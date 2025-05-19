@@ -1,0 +1,82 @@
+services:
+  billing_app_test:
+    image: python:3.12-slim
+    container_name: billing-app
+    working_dir: /app
+    volumes:
+      - ./billing/flask-in:/app
+      - ./test_env_results:/test_env_results
+    command: /bin/sh -c "pip install --no-cache-dir -r requirements.txt && flask run --host=0.0.0.0 --port=5000"
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+      - MYSQL_HOST=billdb
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=root
+      - MYSQL_DATABASE=billdb
+    ports:
+      - "8083:5001"
+    depends_on:
+      - billdb
+    networks:
+    - mynet
+
+  bill_db_test:
+    image: mysql:5.7
+    container_name: billdb
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: billdb
+    ports:
+      -8084:3306
+    volumes:
+      - ./billing/billdb:/docker-entrypoint-initdb.d
+      - ./test_env_results:/test_env_results
+    networks:
+      - mynet
+
+  weight_app_test:
+    build: ./weight
+    image: weight_app_test:latest
+    container_name: weight_app_test
+    ports:
+      - "5003:5000"
+    environment:
+      MYSQL_HOST: weight_db_test
+      MYSQL_USER: root
+      MYSQL_PASSWORD: rootpassword
+    volumes:
+      - ./weight/in:/weight/app/in
+      - ./test_env_results:/test_env_results
+    depends_on:
+      - weight_db_test
+    restart: on-failure
+    networks:
+      - gan_shmuel_test
+
+  weight_db_test:
+    image: mysql:9
+    container_name: weight_db_test
+    ports:
+      - "3309:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: weight_test
+      MYSQL_USER: your_mysql_user
+      MYSQL_PASSWORD: your_mysql_password
+    volumes:
+      - weight_test:/var/lib/mysql
+      - ./weight/db-init:/docker-entrypoint-initdb.d
+      - ./test_env_results:/test_env_results
+    restart: on-failure
+    networks:
+      - gan_shmuel_test
+
+
+volumes:
+  billing_test:
+  weight_test:
+
+networks:
+  gan_shmuel_test:
+    name: gan_shmuel_test
