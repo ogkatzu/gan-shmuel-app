@@ -5,6 +5,7 @@ from mysql.connector import Error
 
 app = Flask(__name__)
 
+
 def get_db_connection():
     return mysql.connector.connect(
         host=os.environ.get("MYSQL_HOST", "localhost"),
@@ -12,6 +13,7 @@ def get_db_connection():
         password=os.environ.get("MYSQL_PASSWORD", ""),
         database=os.environ.get("MYSQL_DATABASE", "billdb")
     )
+
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -22,10 +24,11 @@ def health():
     except Error:
         return jsonify({"status": "Failure"}), 500
 
+
 @app.route("/provider", methods=["POST"])
 def create_provider():
     try:
-        data = request.json
+        data = request.get_json()
         name = data.get("name")
         if not name:
             return jsonify({"error": "Missing 'name' field"}), 400
@@ -41,10 +44,11 @@ def create_provider():
     except Error as e:
         return jsonify({"error": str(e)}), 500
 
+
 @app.route("/provider/<int:provider_id>", methods=["PUT"])
 def update_provider(provider_id):
     try:
-        data = request.json
+        data = request.get_json()
         name = data.get("name")
         if not name:
             return jsonify({"error": "Missing 'name' field"}), 400
@@ -65,6 +69,57 @@ def update_provider(provider_id):
         return jsonify({"updated_name": name}), 200
     except Error as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/post_truck', methods=['POST'])
+def post_truck():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': 'Missing or invalid JSON'}), 400
+
+    if not isinstance(data, list):
+        return jsonify({'error': 'Expected a list of truck items'}), 400
+
+    for entry in data:
+        if not all(k in entry for k in ['Product', 'Rate', 'Scope']):
+            return jsonify({'error': f'Missing keys in entry: {entry}'}), 400
+
+    return jsonify({
+        'message': 'Truck data received successfully',
+        'entries_received': len(data)
+    }), 200
+
+
+@app.route('/get_truck', methods=['GET'])
+def get_truck():
+    product = request.args.get('Product')
+    rate = request.args.get('Rate')
+    scope = request.args.get('Scope')
+
+    return jsonify({
+        'Product': product,
+        'Rate': rate,
+        'Scope': scope,
+        'message': 'GET request received'
+    })
+
+
+@app.route('/get_truck/<truck_id>', methods=['GET'])
+def get_truck_id(truck_id):
+    # You can still get optional query params if needed
+    product = request.args.get('Product')
+    rate = request.args.get('Rate')
+    scope = request.args.get('Scope')
+
+    return jsonify({
+        'TruckID': truck_id,
+        'Product': product,
+        'Rate': rate,
+        'Scope': scope,
+        'message': f'GET request received for truck {truck_id}'
+    })
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
