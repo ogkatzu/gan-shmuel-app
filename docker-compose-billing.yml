@@ -1,31 +1,29 @@
+version: "3.8"
+
 services:
   billing-app:
-    image: python:3.12-slim
+    build:
+      context: ./billing/flask-in
+      dockerfile: Dockerfile
+    image: billing-app:1.0
     container_name: billing-app
     working_dir: /app
-    volumes:
-      - ./billing/flask-in:/app
-    command: /bin/sh -c "pip install --no-cache-dir -r requirements.txt && flask run --host=0.0.0.0 --port=5000"
-    environment:
-      - FLASK_APP=app.py
-      - FLASK_ENV=development
-      - MYSQL_HOST=billdb
-      - MYSQL_USER=root
-      - MYSQL_PASSWORD=root
-      - MYSQL_DATABASE=billdb
+    env_file: .env
     ports:
       - "5500:5000"
+    volumes:
+      - ./billing/flask-in:/app
     depends_on:
       - billdb
     networks:
-    - backend
+      - backend
 
   billdb:
     image: mysql:5.7
     container_name: billdb
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: billdb
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     volumes:
       - ./billing/billdb:/docker-entrypoint-initdb.d
     networks:
