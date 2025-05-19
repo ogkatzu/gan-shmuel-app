@@ -121,5 +121,45 @@ def get_truck_id(truck_id):
     })
 
 
+@app.route("/truck", methods=["POST"])
+def register_truck():
+    try:
+        data = request.json
+        truck_id = data.get("id")
+        provider_id = data.get("provider")
+
+        # Check for required fields in request
+        if not truck_id or not provider_id:
+            return jsonify({"error": "Missing 'id' or 'provider' field"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if provider exists
+        cursor.execute("SELECT 1 FROM Provider WHERE id = %s", (provider_id,))
+        if cursor.fetchone() is None:
+            conn.close()
+            return jsonify({"error": f"Provider ID {provider_id} does not exist"}), 404
+
+        # Check if truck ID already exists
+        cursor.execute("SELECT 1 FROM Trucks WHERE id = %s", (truck_id,))
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({"error": f"Truck with ID {truck_id} already exists"}), 409
+
+        # Insert new truck
+        cursor.execute("INSERT INTO Trucks (id, provider_id) VALUES (%s, %s)", (truck_id, provider_id))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"status": "registered"}), 201
+
+    except Error as e:
+        return jsonify({"error": str(e)}), 500
+
+    except Error as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
