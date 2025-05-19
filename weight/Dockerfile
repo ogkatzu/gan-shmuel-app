@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY api.py /app/
 COPY requirements.txt /app/
+#COPY .env app/
 #COPY templates/ /app/templates/
 
 RUN pip install --no-cache-dir -r requirements.txt
