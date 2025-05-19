@@ -4,11 +4,8 @@ import pymysql
 import os
 from datetime import datetime
 from sqlalchemy import text
-import csv
-import json
-
-
-
+import auxillary_functions 
+import csv ,json
 
 app = Flask(__name__, template_folder='templates')
 # enviromental/global vars go here
@@ -20,7 +17,23 @@ db = os.environ.get("MYSQL_DATABASE")
 app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{user}:{password}@{host}/{db}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+
 db = SQLAlchemy(app)
+@app.route('/weight', methods=['GET'])
+def get_weight():
+    # get request parameters
+    from_time = request.args.get('from')
+    to_time = request.args.get('to')
+    filter_directions = request.args.get('filter')
+
+    #Call auxiliary function to get data
+    transactions = auxillary_functions.get_transactions_by_time_range(db.session,Transaction,from_time, to_time, filter_directions)
+
+    #Return results in JSON format
+
+    return jsonify(transactions)
+
+
 
 #container db model
 class Container(db.Model):
@@ -55,33 +68,9 @@ def get_weight():
 def post_weight():
     return "some value"
 
-@app.route("/unknown", methods=["GET"])  
-def get_unknown():
-    unknown = Transaction.query.all()  
-    # Retrieves all records from the Transaction table in the database
-    ids = set()  
-    # Initializes an empty set to store container IDs that are considered "unknown" (i.e., not found in the Container table).
-    # A set is used to automatically avoid duplicates.
-    for tx in unknown:  
-        # Iterates over all transactions
-        if tx.containers:  
-            # Checks if the transaction has any container IDs listed
-            for cid in tx.containers.split(","):  
-                # Splits the container string (assumed to be comma-separated IDs)
-                cid = cid.strip()  
-                # Removes any leading/trailing whitespace from the container ID
-                if cid and not Container.query.get(cid):  
-                    # Checks if the ID is non-empty AND does NOT exist in the Container table
-                    ids.add(cid)  
-                    # Adds the container ID to the set of unknown containers
-    return jsonify(list(ids))  
-    # Converts the set of unknown IDs into a list and returns it as a JSON response
-
-
 @app.route("/session/<int:session_id>", methods=["GET"])
 def get_session(session_id):
     tx = Transaction.query.get(session_id)
-
     if not tx:
         return jsonify({"error": "Not found"}), 404
     result = {
@@ -109,46 +98,36 @@ def health():
 @app.route("/batch-weight", methods=["POST"])
 def batch_weight():
     # Debug print to check received JSON payload
-    print("Received JSON:", request.get_json())
-
-    # Extract 'file' parameter from the JSON request body
-    filename = request.json.get("file")
+    print('Received JSON:', request.get_json())
+    # Extract ‘file’ parameter from the JSON request body
+    filename = request.json.get('file')
     if not filename:
-        return jsonify({"error": "Missing file parameter"}), 400
-
+        return jsonify({'error': 'Missing file parameter'}), 400
     # Construct the full file path
-    filepath = os.path.join("in", filename)
-
+    filepath = os.path.join('in', filename)
     # Check if the file exists
     if not os.path.exists(filepath):
-        return jsonify({"error": "File not found"}), 400
-
+        return jsonify({'error': 'File not found'}), 400
     added = 0  # Counter for how many records were added/updated
-
     try:
         # Handle CSV file
-        if filename.endswith(".csv"):
+        if filename.endswith('.csv'):
             with open(filepath, newline='') as csvfile:
                 reader = csv.reader(csvfile)
                 headers = next(reader, None)  # Read the header row
                 if not headers or len(headers) < 2:
-                    return jsonify({"error": "Invalid CSV headers"}), 400
-
+                    return jsonify({'error': 'Invalid CSV headers'}), 400
                 unit = headers[1].lower()  # Get unit from header
-
                 for row in reader:
                     if len(row) < 2:
                         continue  # Skip malformed rows
-
                     cid = row[0].strip()
                     try:
                         w = float(row[1])
                     except ValueError:
                         continue  # Skip rows with invalid weight
-
                     if not cid:
                         continue  # Skip empty container ID
-
                     # Check if container already exists
                     existing = Container.query.get(cid)
                     if existing:
@@ -160,28 +139,23 @@ def batch_weight():
                         new = Container(container_id=cid, weight=w, unit=unit)
                         db.session.add(new)
                     added += 1
-
         # Handle JSON file
-        elif filename.endswith(".json"):
+        elif filename.endswith('.json'):
             with open(filepath) as jsonfile:
                 data = json.load(jsonfile)
                 if not isinstance(data, list):
-                    return jsonify({"error": "JSON format must be a list"}), 400
-
+                    return jsonify({'error': 'JSON format must be a list'}), 400
                 for item in data:
-                    cid = item.get("id")
-                    w = item.get("weight")
-                    unit = item.get("unit", "").lower()
-
+                    cid = item.get('id')
+                    w = item.get('weight')
+                    unit = item.get('unit', '').lower()
                     # Validate required fields
                     if not cid or w is None or not unit:
                         continue
-
                     try:
                         w = float(w)
                     except ValueError:
                         continue  # Skip invalid weights
-
                     # Check if container already exists
                     existing = Container.query.get(cid)
                     if existing:
@@ -193,19 +167,15 @@ def batch_weight():
                         new = Container(container_id=cid, weight=w, unit=unit)
                         db.session.add(new)
                     added += 1
-
         # Unsupported file type
         else:
-            return jsonify({"error": "Unsupported file format"}), 400
-
+            return jsonify({'error': 'Unsupported file format'}), 400
         # Commit all changes to the database
         db.session.commit()
-        return jsonify({"status": "ok", "added": added})
-
+        return jsonify({'status': 'ok', 'added': added})
     # Catch and return any unexpected errors
     except Exception as e:
-        return jsonify({"error": "An error occurred", "details": str(e)}), 500
-
+        return jsonify({'error': 'An error occurred', 'details': str(e)}), 500
 
 @app.route("/containers", methods=["GET"])
 def get_containers():
@@ -254,7 +224,4 @@ def get_transactions():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-    app.run(host="0.0.0.0", port=5000)
-
-
-
+    app.run(debug=True,host="0.0.0.0", port=5000)
