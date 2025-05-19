@@ -36,3 +36,4 @@ junit.xml
 Thumbs.db
 *.swp
 *.swo
+.mypy_cache/

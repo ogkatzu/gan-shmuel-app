@@ -2,6 +2,7 @@
 
 LOGFILE="logs/api.log"
 mkdir -p "$(dirname "$LOGFILE")"
+touch logs/api.log
 
 timestamp() {
     date +"%Y-%m-%d %H:%M:%S"
