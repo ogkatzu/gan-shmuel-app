@@ -269,7 +269,7 @@ def webhook():
     is_pr = False
     is_repo_local = os.path.exists(CONFIG['repo_path'])
     if payload.get('commits'):
-        commit_id = payload['commits'][-1]['author']['email']
+        recive = payload['commits'][-1]['author']['email']
     # Check if it's a push to main
     if 'ref' in payload and payload['ref'] == f"refs/heads/{CONFIG['main_branch']}":
         is_merge_to_main = True
@@ -285,8 +285,9 @@ def webhook():
     # If neither PR nor merge to main, return 200 with no action
     if not is_merge_to_main and not is_pr:
         logger.info("Webhook is neither PR nor merge to main, no action needed")
+        send_email("Webhook Ignored", "Webhook is neither PR nor merge to main, no action needed", CONFIG['email_sender'],recive,True)  
         return jsonify({'status': 'success', 'message': 'No action needed'}), 200
-    
+         
     # Process according to the flowchart
     result_message = ""
     
