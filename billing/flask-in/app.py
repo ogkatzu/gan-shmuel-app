@@ -163,5 +163,45 @@ def register_truck():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/truck/<id>", methods=["PUT"])
+def update_truck_provider(id):
+    try:
+        data = request.json
+        new_provider_id = data.get("provider")
+
+        # validation
+        if not new_provider_id:
+            return jsonify({"error": "Missing 'provider' field"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # check truck exists
+        cursor.execute("SELECT 1 FROM Trucks WHERE id = %s", (id,))
+        if cursor.fetchone() is None:
+            conn.close()
+            return jsonify({"error": f"Truck ID {id} does not exist"}), 404
+
+        # check new provider exists
+        cursor.execute("SELECT 1 FROM Provider WHERE id = %s", (new_provider_id,))
+        if cursor.fetchone() is None:
+            conn.close()
+            return jsonify({"error": f"Provider ID {new_provider_id} does not exist"}), 404
+
+        # update provider_id
+        cursor.execute("UPDATE Trucks SET provider_id = %s WHERE id = %s", (new_provider_id, id))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"status": "provider updated"}), 200
+
+    except Error as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
