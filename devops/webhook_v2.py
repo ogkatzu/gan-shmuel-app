@@ -262,7 +262,8 @@ def webhook():
     
     # Get payload
     payload = request.json
-    
+    with open('payload.json', 'w') as f:
+        json.dump(payload, f, indent=4)
     # Extract information
     is_merge_to_main = False
     is_pr = False
