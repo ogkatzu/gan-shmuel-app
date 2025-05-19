@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify
 import mysql.connector
 from mysql.connector import Error
 import pandas as pd
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
