@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify,render_template
 from flask_sqlalchemy import SQLAlchemy
 import pymysql
 import os
@@ -42,6 +42,10 @@ class Transaction(db.Model):
     neto = db.Column(db.Integer)
     produce = db.Column(db.String(50))
 
+
+@app.route("/")
+def index():
+    return render_template("index.html")
 
 @app.route('/weight', methods=['GET'])
 def get_weight():
@@ -100,7 +104,7 @@ def db_check():
 
 @app.route("/health", methods=["GET"])
 def health():
-        return "OK", 200
+        return jsonify("OK"), 200
 
 @app.route("/batch-weight", methods=["POST"])
 def batch_weight():
@@ -201,6 +205,50 @@ def batch_weight():
     # Catch and return any unexpected errors
     except Exception as e:
         return jsonify({"error": "An error occurred", "details": str(e)}), 500
+
+
+@app.route("/containers", methods=["GET"])
+def get_containers():
+    containers = Container.query.all()
+    containers_list = [
+        {
+            "container_id": c.container_id,
+            "weight": c.weight,
+            "unit": c.unit
+        }
+        for c in containers
+    ]
+    return jsonify({
+        "count": len(containers_list),
+        "containers": containers_list
+    })
+
+
+@app.route("/transactions", methods=["GET"])
+def get_transactions():
+    transactions = Transaction.query.all()
+    transactions_list = [
+        {
+            "id": t.id,
+            "datetime": t.datetime,
+            "direction": t.direction,
+            "truck": t.truck,
+            "containers": t.containers,
+            "bruto": t.bruto,
+            "truckTara": t.truckTara,
+            "neto": t.neto,
+            "produce": t.produce
+        }
+        for t in transactions
+    ]
+    return jsonify({
+        "count": len(transactions_list),
+        "transactions": transactions_list
+    })
+
+
+
+
 
 
 if __name__ == "__main__":

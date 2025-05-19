@@ -16,3 +16,6 @@ def test_get_weight():
     res = requests.get(f"{BASE_URL}/weight")
     assert res.status_code == 200
     assert res.text == "some value"
+
+def test_fail_example():
+    assert 1 == 2
