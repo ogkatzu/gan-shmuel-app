@@ -39,35 +39,47 @@ services:
     networks:
       - mynet
 
-  billing-app:
-    build:
-      context: ./billing
+billing-app:
+    image: python:3.12-slim
     container_name: billing-app
+    working_dir: /app
+    volumes:
+      - ./billing/flask-in:/app
+    command: /bin/sh -c "pip install --no-cache-dir -r requirements.txt && flask run --host=0.0.0.0 --port=5000"
     environment:
+      - FLASK_APP=app.py
       - FLASK_ENV=development
+      - MYSQL_HOST=billdb
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=root
+      - MYSQL_DATABASE=billdb
     ports:
       - "8083:5001"
-    networks:
-      - mynet
     depends_on:
-      - billing-db
+      - billdb
+    networks:
+    - mynet
 
-  billing-db:
-    image: mysql:8
-    container_name: billing-db
+billdb:
+    image: mysql:5.7
+    container_name: billdb
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: billdb
-    volumes:
-      - ./billing/mysql-db/nillingdb.sql:/docker-entrypoint-initdb.d/nillingdb.sql
-      - ./billing/db_data:/var/lib/mysql
-
     ports:
-      - "8084:3306"
+      -8084:3306
+    volumes:
+      - ./billing/billdb:/docker-entrypoint-initdb.d
     networks:
       - mynet
+
 
 networks:
   mynet:
     driver: bridge
+
+
+
+
+
 
