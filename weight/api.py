@@ -60,10 +60,6 @@ class Transaction(db.Model):
 def index():
     return render_template("index.html")
 
-@app.route('/weight', methods=['GET'])
-def get_weight():
-    return "some value"
-    
 @app.route('/weight', methods=['POST'])
 def post_weight():
     return "some value"
@@ -217,7 +213,27 @@ def get_transactions():
     })
 
 
-
+@app.route("/unknown", methods=["GET"])  
+def get_unknown():
+    unknown = Transaction.query.all()  
+    # Retrieves all records from the Transaction table in the database
+    ids = set()  
+    # Initializes an empty set to store container IDs that are considered "unknown" (i.e., not found in the Container table).
+    # A set is used to automatically avoid duplicates.
+    for tx in unknown:  
+        # Iterates over all transactions
+        if tx.containers:  
+            # Checks if the transaction has any container IDs listed
+            for cid in tx.containers.split(","):  
+                # Splits the container string (assumed to be comma-separated IDs)
+                cid = cid.strip()  
+                # Removes any leading/trailing whitespace from the container ID
+                if cid and not Container.query.get(cid):  
+                    # Checks if the ID is non-empty AND does NOT exist in the Container table
+                    ids.add(cid)  
+                    # Adds the container ID to the set of unknown containers
+    return jsonify(list(ids))  
+    # Converts the set of unknown IDs into a list and returns it as a JSON response
 
 
 
