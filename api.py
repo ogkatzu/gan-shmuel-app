@@ -4,12 +4,24 @@ import os
 import json
 from datetime import datetime
 from sqlalchemy import text
+import csv
+import sys # for debug
 
-def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_time):
+def print_debug(msg: str):
+    print(msg, file=sys.stdout, flush=True)
+
+def lb_to_kg(unit, weight):
+    if unit == 'lb' and isinstance(weight, int) :
+        weight_in_kg = int(weight /  2.205)
+        unit = 'kg'
+        weight = weight_in_kg(weight)
+    return unit, weight
+
+def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_time, id):
     new_transaction = Transaction()
-    new_transaction.id = create_session_id(exact_time)
+    new_transaction.id = id
     new_transaction.bruto = in_json['bruto']
-    new_transaction.containers = in_json['containers']
+    new_transaction.containers = json.dumps(in_json['containers'])
     new_transaction.datetime = exact_time
     new_transaction.direction = 'out'
     new_transaction.produce = in_json['produce']
@@ -21,36 +33,38 @@ def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_tim
 
 def transaction_to_dict(transaction):
     return {
-        "id": transaction.id,
-        "datetime": transaction.datetime.isoformat() if transaction.datetime else None,
-        "direction": transaction.direction,
-        "truck": transaction.truck,
-        "containers": transaction.containers,
-        "bruto": transaction.bruto,
-        "truckTara": transaction.truckTara,
-        "neto": transaction.neto,
-        "produce": transaction.produce,
-        "session_id": transaction.session_id,
+        'id': transaction.id,
+        'datetime': transaction.datetime.isoformat() if transaction.datetime else None,
+        'direction': transaction.direction,
+        'truck': transaction.truck,
+        'containers': json.loads(transaction.containers) if transaction.containers else [],
+        'bruto': transaction.bruto,
+        'truckTara': transaction.truckTara,
+        'neto': transaction.neto,
+        'produce': transaction.produce,
+        'session_id': transaction.session_id,
     }
 
 def create_session_id(transaction_time):
-    return int(transaction_time.strftime("%y%m%d%H%M%S"))
+    time_as_obj = datetime.fromisoformat(transaction_time)
+    return int(time_as_obj.timestamp())
 
 def create_transaction_from_data_and_session_id(data: json, session_id: int):
     new_transaction = Transaction()
     new_transaction.id = new_transaction.session_id = session_id
-    new_transaction.bruto = data['bruto']
-    new_transaction.containers = data['containers']
+    new_transaction.bruto = data['weight']
+    new_transaction.containers = json.dumps(data['containers'])
     new_transaction.datetime = data['datetime']
     new_transaction.direction = data['direction']
     new_transaction.produce = data['produce']
     new_transaction.truck = data['truck']
+    new_transaction.truckTara = None
+    new_transaction.neto = None
     return new_transaction
 
 
 def insert_transaction(new_transaction, exists: bool):
     if exists:
-        # Fetch and update the existing object
         tx = Transaction.query.get(new_transaction.id)
         tx.bruto = new_transaction.bruto
     else:
@@ -61,47 +75,59 @@ def insert_transaction(new_transaction, exists: bool):
 class truck_direction():
 
     def truck_in(data: json):
-        session_id = create_session_id(data['datetime'])
+        session_id = None
         already_exists = False
-        if data['prev_record']:
-            if data['prev_record']['directiom'] == 'in':
+        try:
+            prev_record = json.loads(data['prev_record'])
+            if prev_record['direction'] == 'in':
                 if not data['force']:
-                    return 400, 'Bad Request'
-                elif data['prev_record']['truck'] != data['truck']:
-                        return 400, 'Bad Request' # better text
+                    return 'Bad Request', 400
+                elif prev_record['truck'] != data['truck']:
+                        return 'Bad Request', 400 # better text, unsure can happen
                 else:
-                    session_id = data['prev_record']['session_id']
+                    session_id = prev_record['session_id']
                     already_exists = True
+        except KeyError:
+            session_id = create_session_id(data['datetime'])
+        data['unit'], data['weight'] = lb_to_kg(data['unit'], data['weight'])
+        data['bruto'] = data['weight']
         new_transaction = create_transaction_from_data_and_session_id(data=data, session_id=session_id)
         insert_transaction(new_transaction=new_transaction, exists=already_exists)
-        ret_json = {"id": new_transaction.id, "truck": new_transaction.truck, "bruto": new_transaction.bruto}
-        return ret_json
+        ret_json = {'id': new_transaction.id, 'truck': new_transaction.truck, 'bruto': new_transaction.bruto}
+        return ret_json, 200
             
 
     def truck_out(data: json):
-        if data['prev_record']['directiom'] == 'out':
+        id = None
+        try:
+            entrance = json.loads(data['prev_record'])
+        except KeyError:
+            return "No in for this out", 400
+        print_debug(f"type of entrance: {type(entrance)}")
+        
+        if entrance['direction'] == 'out':
             if not data['force']:
-                return 400, 'Bad Request'
-            else:
-                if data['prev_record']['truck'] != data['truck']:
-                    return 400, 'Bad Request' # better text
-        entrance = data['prev_record']
+                    return 'Two outs is a row without force', 400
+            elif entrance['truck'] != data['truck']:
+                return 'Bad Request', 400 # better text
+        id = entrance['id']
         bruto = entrance['bruto']
-        truck_tara = data['truckTara']
+        truck_tara = data['weight']
         containers_tara = 0
         container_ids = entrance['containers']
         containers = db.session.query(Container).filter(Container.container_id.in_(container_ids)).all()
         for container in containers:
             if isinstance(container.weight, int) and container.weight > 0:
+                container.unit, container.weight = lb_to_kg(container.unit, container.weight)
                 containers_tara += container.weight
             else:
                 containers_tara = 'NA'
                 break
         neto = bruto - truck_tara - containers_tara
-        new_transaction = in_json_and_extras_to_transaciotn(in_json=entrance, truck_tara=truck_tara, neto=neto, exact_time=data['datetime'])
+        new_transaction = in_json_and_extras_to_transaciotn(in_json=entrance, truck_tara=truck_tara, neto=neto, exact_time=data['datetime'], id=id)
         db.session.add(new_transaction)
-        ret = {"id": new_transaction.id, "truck": new_transaction.truck, "bruto": new_transaction.bruto, "truckTara": new_transaction.truckTara, "neto": new_transaction.neto}
-        return ret
+        ret = {'id': new_transaction.id, 'truck': new_transaction.truck, 'bruto': new_transaction.bruto, 'truckTara': new_transaction.truckTara, 'neto': new_transaction.neto}
+        return ret, 200
 
 
 
@@ -111,10 +137,10 @@ class truck_direction():
 
 app = Flask(__name__, template_folder='templates')
 # enviromental/global vars go here
-user = os.environ.get("MYSQL_USER")
-password = os.environ.get("MYSQL_PASSWORD")
-host = os.environ.get("MYSQL_HOST")
-db = os.environ.get("MYSQL_DATABASE")
+user = os.environ.get('MYSQL_USER')
+password = os.environ.get('MYSQL_PASSWORD')
+host = os.environ.get('MYSQL_HOST')
+db = os.environ.get('MYSQL_DATABASE')
 #set db uri from environment
 app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{user}:{password}@{host}/{db}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -147,79 +173,135 @@ class Transaction(db.Model):
 
 @app.route('/weight', methods=['GET'])
 def get_weight():
-    return "some value"
+    return 'some value'
 
-@app.route("/session/<int:session_id>", methods=["GET"])
+@app.route('/session/<int:session_id>', methods=['GET'])
 def get_session(session_id):
     tx = Transaction.query.get(session_id)
     if not tx:
-        return jsonify({"error": "Not found"}), 404
+        return jsonify({'error': 'Not found'}), 404
     result = {
-        "id": tx.id,
-        "truck": tx.truck,
-        "bruto": tx.bruto
+        'id': tx.id,
+        'truck': tx.truck,
+        'bruto': tx.bruto
     }
-    if tx.direction == "out":
-        result["truckTara"] = tx.truckTara
-        result["neto"] = tx.neto if tx.neto is not None else "na"
+    if tx.direction == 'out':
+        result['truckTara'] = tx.truckTara
+        result['neto'] = tx.neto if tx.neto is not None else 'na'
     return jsonify(result)
 
-@app.route("/db-check", methods=["GET"])
+@app.route('/db-check', methods=['GET'])
 def db_check():
     try:
         db.session.execute(text('SELECT 1'))
-        return {"db": "connected"}, 200
+        return {'db': 'connected'}, 200
     except Exception as e:
-        return {"db": "error", "detail": str(e)}, 500
+        return {'db': 'error', 'detail': str(e)}, 500
 
-@app.route("/health", methods=["GET"])
+@app.route('/health', methods=['GET'])
 def health():
-        return "OK", 200
+        return 'OK', 200
 
 @app.route('/weight', methods=['POST'])
-def post_weight(self):
-    data = request.json()
-    prev_record = db.session.query(Transaction).filter(Transaction.truck == data['truck']).order_by(Transaction.datetime.desc()).first()
+def post_weight():
+    data = request.get_json()
+    prev_record = db.session.query(Transaction).filter(Transaction.truck == data.get('truck')).order_by(Transaction.datetime.desc()).first()
+    
     if prev_record:
-        data['prev_record'] = transaction_to_dict(prev_record)
-    if data['unit'] == 'lb' and isinstance(data['weight'], int) :
-        weight_in_kg = int(data['weight'] /  2.205)
-        data['unit'] = 'kg'
-        data['weight'] = weight_in_kg
+        prev_record = transaction_to_dict(prev_record)
+        prev_record = json.dumps(prev_record)
+        data['prev_record'] = prev_record
+    data['unit'], data['weight'] = lb_to_kg(data.get('unit'), data.get('weight'))
     
-    ret = self.direction_handler[data['direction']](data)
+    ret = direction_handler[data['direction']](data)
+    return ret
 
-  
+@app.route('/batch-weight', methods=['POST'])
+def batch_weight():
+    # Debug print to check received JSON payload
+    print('Received JSON:', request.get_json())
+    # Extract ‘file’ parameter from the JSON request body
+    filename = request.json.get('file')
+    if not filename:
+        return jsonify({'error': 'Missing file parameter'}), 400
+    # Construct the full file path
+    filepath = os.path.join('in', filename)
+    # Check if the file exists
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'File not found'}), 400
+    added = 0  # Counter for how many records were added/updated
+    try:
+        # Handle CSV file
+        if filename.endswith('.csv'):
+            with open(filepath, newline='') as csvfile:
+                reader = csv.reader(csvfile)
+                headers = next(reader, None)  # Read the header row
+                if not headers or len(headers) < 2:
+                    return jsonify({'error': 'Invalid CSV headers'}), 400
+                unit = headers[1].lower()  # Get unit from header
+                for row in reader:
+                    if len(row) < 2:
+                        continue  # Skip malformed rows
+                    cid = row[0].strip()
+                    try:
+                        w = float(row[1])
+                    except ValueError:
+                        continue  # Skip rows with invalid weight
+                    if not cid:
+                        continue  # Skip empty container ID
+                    # Check if container already exists
+                    existing = Container.query.get(cid)
+                    if existing:
+                        # Update existing container
+                        existing.weight = w
+                        existing.unit = unit
+                    else:
+                        # Create new container
+                        new = Container(container_id=cid, weight=w, unit=unit)
+                        db.session.add(new)
+                    added += 1
+        # Handle JSON file
+        elif filename.endswith('.json'):
+            with open(filepath) as jsonfile:
+                data = json.load(jsonfile)
+                if not isinstance(data, list):
+                    return jsonify({'error': 'JSON format must be a list'}), 400
+                for item in data:
+                    cid = item.get('id')
+                    w = item.get('weight')
+                    unit = item.get('unit', '').lower()
+                    # Validate required fields
+                    if not cid or w is None or not unit:
+                        continue
+                    try:
+                        w = float(w)
+                    except ValueError:
+                        continue  # Skip invalid weights
+                    # Check if container already exists
+                    existing = Container.query.get(cid)
+                    if existing:
+                        # Update existing container
+                        existing.weight = w
+                        existing.unit = unit
+                    else:
+                        # Create new container
+                        new = Container(container_id=cid, weight=w, unit=unit)
+                        db.session.add(new)
+                    added += 1
+        # Unsupported file type
+        else:
+            return jsonify({'error': 'Unsupported file format'}), 400
+        # Commit all changes to the database
+        db.session.commit()
+        return jsonify({'status': 'ok', 'added': added})
+    # Catch and return any unexpected errors
+    except Exception as e:
+        return jsonify({'error': 'An error occurred', 'details': str(e)}), 500
 
-    # -direction=in/out/none (none could be used, for example, when weighing a standalone container)
-    # - truck=<license> (If weighing a truck. Otherwise "na")
-    # - containers=str1,str2,... comma delimited list of container ids
-    # - weight=<int>
-    # - unit=kg/lbs {precision is ~5kg, so dropping decimal is a non-issue}
-    # - force=true/false { see logic below }
-    # - produce=<str> {id of produce, e.g. "orange", "tomato", ... OR "na" if empty}
-    # Records data and server date-time and returns a json object with a unique weight.
-    # Note that "in" & "none" will generate a new session id, and "out" will return session id of previous "in" for the truck.
-    # "in" followed by "in" OR "out" followed by "out":
-    # - if force=false will generate an error
-    # - if force=true will over-write previous weigh of same truck
-    # "out" without an "in" will generate error
-    # "none" after "in" will generate error
-    # Return value on success is:
-    # { "id": <str>,
-    #   "truck": <license> or "na",
-    #   "bruto": <int>,
-    #   ONLY for OUT:
-    #   "truckTara": <int>,
-    #   "neto": <int> or "na" // na if some of containers have unknown tara
-    # }    
-    
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
 
 
 
