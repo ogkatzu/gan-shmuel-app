@@ -1,27 +1,13 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify,render_template
 from flask_sqlalchemy import SQLAlchemy
 import os
 import json
 from datetime import datetime
 from sqlalchemy import text
 import csv
-import sys # for debug
-from flask import Flask, request, jsonify,render_template
-from flask_sqlalchemy import SQLAlchemy
-import pymysql
 import os
 
 import auxillary_functions 
-
-def print_debug(msg: str):
-    print(msg, file=sys.stdout, flush=True)
-
-def lb_to_kg(unit, weight):
-    if unit == 'lb' and isinstance(weight, int) :
-        weight_in_kg = int(weight /  2.205)
-        unit = 'kg'
-        weight = weight_in_kg(weight)
-    return unit, weight
 
 def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_time, id):
     new_transaction = Transaction()
@@ -96,7 +82,7 @@ class truck_direction():
                     already_exists = True
         except KeyError:
             session_id = create_session_id(data['datetime'])
-        data['unit'], data['weight'] = lb_to_kg(data['unit'], data['weight'])
+        data['unit'], data['weight'] = auxillary_functions.lb_to_kg(data['unit'], data['weight'])
         data['bruto'] = data['weight']
         new_transaction = create_transaction_from_data_and_session_id(data=data, session_id=session_id)
         insert_transaction(new_transaction=new_transaction, exists=already_exists)
@@ -121,7 +107,7 @@ class truck_direction():
         containers = db.session.query(Container).filter(Container.container_id.in_(container_ids)).all()
         for container in containers:
             if isinstance(container.weight, int) and container.weight > 0:
-                container.unit, container.weight = lb_to_kg(container.unit, container.weight)
+                container.unit, container.weight = auxillary_functions.lb_to_kg(container.unit, container.weight)
                 containers_tara += container.weight
             else:
                 containers_tara = 'NA'
@@ -136,12 +122,12 @@ class truck_direction():
     
     def truck_none(data: json):
                 # none after in should generate an error. Why? What does it mean?
-        print_debug(f"entered truck_none")
+        auxillary_functions.print_debug(f"entered truck_none")
         new_tansaction = Transaction()
         new_tansaction.bruto = data['weight']
         container_id = data['containers'][0] # אthis implementation of none only accepts single container
         container = containers = db.session.query(Container).filter_by(container_id=container_id).first()
-        unit, container_tara = lb_to_kg(container.unit ,container.weight)
+        unit, container_tara = auxillary_functions.lb_to_kg(container.unit ,container.weight)
         new_tansaction.truckTara = container_tara #should this be the case?
         new_tansaction.containers = [container]
         new_tansaction.neto = new_tansaction.bruto - container_tara
@@ -150,11 +136,11 @@ class truck_direction():
         new_tansaction.produce = data['produce']
         new_tansaction.truck = 'na'
         new_tansaction.datetime = data['datetime']
-        print_debug(f"new transaction done: {new_tansaction}")
+        auxillary_functions.print_debug(f"new transaction done: {new_tansaction}")
         db.session.add(new_tansaction)
         db.session.commit()
         ret = {'id': new_tansaction.id, 'truck': new_tansaction.truck, 'bruto': new_tansaction.bruto, 'truckTara': new_tansaction.truckTara, 'neto': new_tansaction.neto}
-        print_debug(f"ret is {ret}")
+        auxillary_functions.print_debug(f"ret is {ret}")
         return ret, 200
         
 
@@ -253,7 +239,7 @@ def post_weight():
             prev_record = transaction_to_dict(prev_record)
             prev_record = json.dumps(prev_record)
             data['prev_record'] = prev_record
-    data['unit'], data['weight'] = lb_to_kg(data.get('unit'), data.get('weight'))
+    data['unit'], data['weight'] = auxillary_functions.lb_to_kg(data.get('unit'), data.get('weight'))
     
     ret = direction_handler[data['direction']](data)
     return ret

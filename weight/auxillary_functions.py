@@ -2,9 +2,6 @@ from datetime import datetime
 from sqlalchemy import text
 import sys
 
-def print_debug(msg: str):
-    print(msg, file=sys.stdout, flush=True)
-
 def lb_to_kg(unit, weight):
     if unit == 'lb' and isinstance(weight, int) :
         weight_in_kg = int(weight /  2.205)
