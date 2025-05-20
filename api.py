@@ -129,9 +129,11 @@ class truck_direction():
         return ret, 200
     
     def truck_none(data: json):
-        # none after in should generate an error. Why? What does it mean?
+                # none after in should generate an error. Why? What does it mean?
+        print_debug(f"entered truck_none")
         new_tansaction = Transaction()
         new_tansaction.bruto = data['weight']
+        container_id = data['containers'][0] # אthis implementation of none only accepts single container
         container = containers = db.session.query(Container).filter_by(container_id=container_id).first()
         unit, container_tara = lb_to_kg(container.unit ,container.weight)
         new_tansaction.truckTara = container_tara #should this be the case?
@@ -141,14 +143,14 @@ class truck_direction():
         new_tansaction.direction = 'none'
         new_tansaction.produce = data['produce']
         new_tansaction.truck = 'na'
-        db.session.add(new_transaction)
+        new_tansaction.datetime = data['datetime']
+        print_debug(f"new transaction done: {new_tansaction}")
+        db.session.add(new_tansaction)
         db.session.commit()
-        ret = {'id': new_transaction.id, 'truck': new_transaction.truck, 'bruto': new_transaction.bruto, 'truckTara': new_transaction.truckTara, 'neto': new_transaction.neto}
+        ret = {'id': new_tansaction.id, 'truck': new_tansaction.truck, 'bruto': new_tansaction.bruto, 'truckTara': new_tansaction.truckTara, 'neto': new_tansaction.neto}
+        print_debug(f"ret is {ret}")
+        return ret, 200
         
-
-
-    def truck_none(data: json):
-        pass
 
 
 app = Flask(__name__, template_folder='templates')
@@ -221,11 +223,12 @@ def health():
 @app.route('/weight', methods=['POST'])
 def post_weight():
     data = request.get_json()
-    prev_record = db.session.query(Transaction).filter(Transaction.truck == data.get('truck')).order_by(Transaction.datetime.desc()).first()
-    if prev_record:
-        prev_record = transaction_to_dict(prev_record)
-        prev_record = json.dumps(prev_record)
-        data['prev_record'] = prev_record
+    if not data['direction'] == 'none':
+        prev_record = db.session.query(Transaction).filter(Transaction.truck == data.get('truck')).order_by(Transaction.datetime.desc()).first()
+        if prev_record:
+            prev_record = transaction_to_dict(prev_record)
+            prev_record = json.dumps(prev_record)
+            data['prev_record'] = prev_record
     data['unit'], data['weight'] = lb_to_kg(data.get('unit'), data.get('weight'))
     
     ret = direction_handler[data['direction']](data)
