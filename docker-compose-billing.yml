@@ -10,7 +10,7 @@ services:
     working_dir: /app
     env_file: .env
     ports:
-      - "5500:5000"
+      - "5500:5500"
     volumes:
       - ./billing/flask-in:/app
     depends_on:

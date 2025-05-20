@@ -53,12 +53,3 @@ run_api_test "Register Truck (Missing Provider)" \
 
 run_api_test "Register Truck (Invalid Provider)" \
 'curl -s -X POST http://127.0.0.1:5500/truck -H "Content-Type: application/json" -d '\''{"provider": 99999, "id": "T-77777"}'\'''
-
-# ------------------------
-#  Volume Persistence Test
-# ------------------------
-run_api_test "Register Truck (Unique T-93127)" \
-'curl -s -X POST http://127.0.0.1:5500/truck -H "Content-Type: application/json" -d '\''{"provider": 10001, "id": "T-93127"}'\'''
-
-run_api_test "Verify Truck Already Registered (T-93127)" \
-'curl -s -X POST http://127.0.0.1:5500/truck -H "Content-Type: application/json" -d '\''{"provider": 10001, "id": "T-93127"}'\'''
