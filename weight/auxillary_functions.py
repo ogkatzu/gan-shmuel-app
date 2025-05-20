@@ -9,7 +9,7 @@ def lb_to_kg(unit, weight):
     if unit == 'lb' and isinstance(weight, int) :
         weight_in_kg = int(weight /  2.205)
         unit = 'kg'
-        weight = weight_in_kg(weight)
+        weight = weight_in_kg
     return unit, weight
 
 
@@ -81,3 +81,5 @@ def get_transactions_by_time_range(db_session,Transaction_model,from_time, to_ti
     except Exception as e:
         print(f"Error executing query: {e}")
         return []
+    
+    

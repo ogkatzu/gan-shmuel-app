@@ -89,7 +89,7 @@ def db_check():
 
 @app.route("/health", methods=["GET"])
 def health():
-        return jsonify("OK"), 200
+    return jsonify({"status": "OK"}), 200
 
 @app.route("/batch-weight", methods=["POST"])
 def batch_weight():
@@ -173,6 +173,7 @@ def batch_weight():
     except Exception as e:
         return jsonify({'error': 'An error occurred', 'details': str(e)}), 500
 
+# only for show containers db in html
 @app.route("/containers", methods=["GET"])
 def get_containers():
     containers = Container.query.all()
@@ -189,7 +190,7 @@ def get_containers():
         "containers": containers_list
     })
 
-
+# only for show transactions db in html
 @app.route("/transactions", methods=["GET"])
 def get_transactions():
     transactions = Transaction.query.all()
@@ -240,4 +241,4 @@ def get_unknown():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-    app.run(debug=True,host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000)
