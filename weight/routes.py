@@ -5,7 +5,7 @@ import os
 from sqlalchemy import text
 import csv
 
-from classes_db import Container, Transaction
+from classes_db import Container, Transaction, db
 import auxillary_functions
 
 
@@ -32,31 +32,31 @@ def register_routes(app):
         return jsonify(result)
 
 
-@app.route('/db-check', methods=['GET'])
-def db_check():
-    try:
-        db.session.execute(text('SELECT 1'))
-        return {'db': 'connected'}, 200
-    except Exception as e:
-        return {'db': 'error', 'detail': str(e)}, 500
+    @app.route('/db-check', methods=['GET'])
+    def db_check():
+        try:
+            db.session.execute(text('SELECT 1'))
+            return {'db': 'connected'}, 200
+        except Exception as e:
+            return {'db': 'error', 'detail': str(e)}, 500
 
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({"status": "OK"}), 200
+    @app.route('/health', methods=['GET'])
+    def health():
+        return jsonify({"status": "OK"}), 200
 
-@app.route('/weight', methods=['POST'])
-def post_weight():
-    data = request.get_json()
-    if not data['direction'] == 'none':
-        prev_record = db.session.query(Transaction).filter(Transaction.truck == data.get('truck')).order_by(Transaction.datetime.desc()).first()
-        if prev_record:
-            prev_record = transaction_to_dict(prev_record)
-            prev_record = json.dumps(prev_record)
-            data['prev_record'] = prev_record
-    data['unit'], data['weight'] = auxillary_functions.lb_to_kg(data.get('unit'), data.get('weight'))
-    
-    ret = direction_handler[data['direction']](data)
-    return ret
+    @app.route('/weight', methods=['POST'])
+    def post_weight():
+        data = request.get_json()
+        if not data['direction'] == 'none':
+            prev_record = db.session.query(Transaction).filter(Transaction.truck == data.get('truck')).order_by(Transaction.datetime.desc()).first()
+            if prev_record:
+                prev_record = transaction_to_dict(prev_record)
+                prev_record = json.dumps(prev_record)
+                data['prev_record'] = prev_record
+        data['unit'], data['weight'] = auxillary_functions.lb_to_kg(data.get('unit'), data.get('weight'))
+        
+        ret = direction_handler[data['direction']](data)
+        return ret
 
 
 @app.route("/batch-weight", methods=["POST"])
