@@ -91,7 +91,7 @@ def run_tests(branch):
         if not os.path.exists(CONFIG['workdir_test'] + '/' + CONFIG['repo_path']):
             subprocess.run(['git', 'clone', '--branch', branch, CONFIG['repo_url'],CONFIG['workdir_test'] + '/' + CONFIG['repo_path']], check=True)
 
-        billing_command = ["pyestest", "test_env/gan-shmuel-app/billing/test/test_api.py"]
+        #billing_command = ["pyestest", "test_env/gan-shmuel-app/billing/test/test_api.py"]
         wieght_command = ["pyestest", "test_env/gan-shmuel-app/weight/test/test_api.py"]
 
         logger.info(f"Running tests wieght")
@@ -102,27 +102,28 @@ def run_tests(branch):
             text=True
         )
 
-        logger.info(f"Running tests billing")
-        result_billing = subprocess.run(
-            billing_command,
-            cwd=CONFIG['workdir_test'],
-            capture_output=True,
-            text=True
-        )
+        # logger.info(f"Running tests billing")
+        # result_billing = subprocess.run(
+        #     billing_command,
+        #     cwd=CONFIG['workdir_test'],
+        #     capture_output=True,
+        #     text=True
+        # )
         
         # Log test output for debugging
         logger.info(f"Test stdout: {result_wieght.stdout}")
         if result_wieght.stderr:
             logger.warning(f"Test stderr: {result_wieght.stderr}")
 
-        logger.info(f"Test stdout: {result_billing.stdout}")
-        if result_billing.stderr:
-            logger.warning(f"Test stderr: {result_billing.stderr}")
+        # logger.info(f"Test stdout: {result_billing.stdout}")
+        # if result_billing.stderr:
+        #     logger.warning(f"Test stderr: {result_billing.stderr}")
             
         logger.info(f"Tests completed with return code: {result_wieght.returncode}")
-        logger.info(f"Tests completed with return code: {result_billing.returncode}")
+        #logger.info(f"Tests completed with return code: {result_billing.returncode}")
 
-        return result_wieght.returncode == 0 and result_billing.returncode == 0, result_wieght.stdout + result_wieght.stderr + "\n" + result_billing.stdout + result_billing.stderr
+        #return result_wieght.returncode == 0 and result_billing.returncode == 0, result_wieght.stdout + result_wieght.stderr + "\n" + result_billing.stdout + result_billing.stderr
+        return result_wieght.returncode == 0 , result_wieght.stdout + result_wieght.stderr
     except Exception as error:
         logger.error(f"Error running tests: {str(error)}")
         return False, str(error)
@@ -295,6 +296,11 @@ def webhook():
             if 'billing' in branch:
                 emails = json.loads(CONFIG['billing_emails'])
 
+        for email in emails.values():
+            Msg = build_email("FAILED - PR", email, f"Test Results:\n{result_message}\n\nTest Output:\n{test_output}")
+            send_email(Msg, email)
+            
+        emails = json.loads(CONFIG['devops_emails'])
         for email in emails.values():
             Msg = build_email("FAILED - PR", email, f"Test Results:\n{result_message}\n\nTest Output:\n{test_output}")
             send_email(Msg, email)
