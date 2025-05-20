@@ -1,0 +1,89 @@
+services:
+  billing_app_test:
+    image: python:3.12-slim
+    container_name: billing-app
+    working_dir: /app
+    volumes:
+      - ./billing_test/flask-in:/app
+    command: /bin/sh -c "pip install --no-cache-dir -r requirements.txt && flask run --host=0.0.0.0 --port=5002"
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+      - MYSQL_HOST=billdb
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=root
+      - MYSQL_DATABASE=billdb
+    ports:
+      - "8083:5001"
+    depends_on:
+      - bill_db_test
+    networks:
+    - gan_shmuel_test_billing
+    - gan_shmuel_test_apps
+
+  bill_db_test:
+    image: mysql:5.7
+    container_name: billdb
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: billdb
+    ports:
+      - 8084:3306
+    volumes:
+      - ./billing_test/billdb:/docker-entrypoint-initdb.d
+      - ./test_env_results:/test_env_results
+    networks:
+      - gan_shmuel_test_billing
+
+  weight_app_test:
+    build: ./weight_test
+    ports:
+      - "5000:5000"
+    environment:
+      MYSQL_DATABASE: root
+      MYSQL_ROOT_PASSWORD: 123
+      MYSQL_USER: yarden
+      MYSQL_PASSWORD: 123
+      MYSQL_HOST: weight_db_test
+
+    depends_on:
+      weight_db_test:
+       condition: service_healthy
+    volumes:
+      - ./weight_test:/app
+      - ./weight_test/in:/in
+    networks:
+      - gan_shmuel_test_apps
+      - gan_shmuel_test_weight
+
+  weight_db_test:
+    image: mysql:8
+    restart: always
+    environment:
+      MYSQL_DATABASE: root
+      MYSQL_ROOT_PASSWORD: 123
+      MYSQL_USER: yarden
+      MYSQL_PASSWORD: 123
+      MYSQL_HOST: weight_db_test
+    volumes:
+      - ./weight_test/weightdb.sql:/docker-entrypoint-initdb.d/weightdb.sql  # Mount the SQL file
+      - ./weight_test/db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gan_shmuel_test_weight
+
+volumes:
+  billing_test:
+  weight_test:
+
+networks:
+  gan_shmuel_test_weight:
+    name: gan_shmuel_test_weight
+  gan_shmuel_test_billing:
+    name: gan_shmuel_test_billing
+  gan_shmuel_test_apps:
+    name: gan_shmuel_test_apps
