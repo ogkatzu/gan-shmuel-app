@@ -25,7 +25,7 @@ def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_tim
 
 def transaction_to_dict(transaction):
     if not isinstance(transaction.datetime, datetime):
-        transaction.datetime = datetime.strptime(transaction.datetime, "%Y-%m-%dT%H:%M:%S")
+        transaction.datetime = datetime.strptime(transaction.datetime, '%Y%m%d%H%M%S')
     return {
         'id': transaction.id,           
         'datetime': transaction.datetime.isoformat() if transaction.datetime else None,
@@ -122,7 +122,6 @@ class truck_direction():
     
     def truck_none(data: json):
                 # none after in should generate an error. Why? What does it mean?
-        auxillary_functions.print_debug(f"entered truck_none")
         new_tansaction = Transaction()
         new_tansaction.bruto = data['weight']
         container_id = data['containers'][0] # אthis implementation of none only accepts single container
@@ -136,11 +135,9 @@ class truck_direction():
         new_tansaction.produce = data['produce']
         new_tansaction.truck = 'na'
         new_tansaction.datetime = data['datetime']
-        auxillary_functions.print_debug(f"new transaction done: {new_tansaction}")
         db.session.add(new_tansaction)
         db.session.commit()
         ret = {'id': new_tansaction.id, 'truck': new_tansaction.truck, 'bruto': new_tansaction.bruto, 'truckTara': new_tansaction.truckTara, 'neto': new_tansaction.neto}
-        auxillary_functions.print_debug(f"ret is {ret}")
         return ret, 200
         
 
@@ -159,37 +156,18 @@ direction_handler = {'in': _truck_direction.truck_in, 'out': _truck_direction.tr
 
 db = SQLAlchemy(app)
 
-
-@app.route('/weight', methods=['GET'])
-def get_weight():
-    # get request parameters
-    from_time = request.args.get('from')
-    to_time = request.args.get('to')
-    filter_directions = request.args.get('filter')
-
-    #Call auxiliary function to get data
-    transactions = auxillary_functions.get_transactions_by_time_range(db.session,Transaction,from_time, to_time, filter_directions)
-
-    #Return results in JSON format
-
-    return jsonify(transactions)
-
-
 @app.route('/item/<id>', methods=['GET'])
 def get_item(id):
     
     from_date = request.args.get('from')
     to_date = request.args.get('to')
     
+    item_data = get_item_data(date_from=from_date, date_to=to_date, id=id)
     
-    item_data = auxillary_functions.get_item_data()
-    
-   
     if item_data is None:
         return jsonify({"error": "Item not found"}), 404
     
-   
-    return jsonify(item_data)
+    return jsonify(item_data), 200
 
 def find_transactions_by_container(container_id, start_time, end_time):
     transactions = db.session.query(Transaction).filter(
@@ -254,7 +232,7 @@ def get_item_data(date_from, date_to, id):
     list(set(session_ids))
     
     ret = {"id": id, "tara": tara if tara else 'na', 'sessions': session_ids, 'unit': 'kg'}
-    return jsonify(ret), 200
+    return ret
 
 
 #container db model
@@ -439,7 +417,6 @@ def get_containers():
         "count": len(containers_list),
         "containers": containers_list
     })
-
     
 @app.route("/unknown", methods=["GET"])  
 def get_unknown():
@@ -486,21 +463,6 @@ def get_transactions():
         "transactions": transactions_list
     })
 
-@app.route("/containers", methods=["GET"])
-def get_containers():
-    containers = Container.query.all()
-    containers_list = [
-        {
-            "container_id": c.container_id,
-            "weight": c.weight,
-            "unit": c.unit
-        }
-        for c in containers
-    ]
-    return jsonify({
-        "count": len(containers_list),
-        "containers": containers_list
-    })
 
 
 if __name__ == '__main__':
