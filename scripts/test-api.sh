@@ -52,11 +52,17 @@ run_api_test "Register Truck (Missing Provider)" \
 'curl -s -X POST http://127.0.0.1:5500/truck -H "Content-Type: application/json" -d '\''{"id": "T-99999"}'\'''
 
 run_api_test "Register Truck (Invalid Provider)" \
-'curl -s -X POST http://127.0.0.1:5500/truck -H "Content-Type: application/json" -d '\''{"provider": 99999, "id": "T-77777"}'\'''
+'curl -s -X POST http://127.0.0.1:5500/truck -H "Content-Type: application/json" -d '\''{"provider": 10001, "id": "T-77777"}'\'''
+
 run_api_test "Register Truck (nonexistent provider)" \
 'curl -s -X POST http://127.0.0.1:5500/truck -H "Content-Type: application/json" -d '\''{"provider": 99999, "id": "T-77777"}'\'''
 
 
 # === Rates Tests ===
-# run_api_test "POST truck (convert xl to mysql)" \
-# 'curl -s -X POST http://127.0.0.1:5500/post_rates'
+run_api_test "POST rates (convert xl to mysql)" \
+'curl -s -X POST http://127.0.0.1:5500/post_rates'
+# will take from xl and put at DB.
+
+run_api_test "get rates (convert mysql to xl )" \
+curl -s -X GET http://127.0.0.1:5500/rates
+# will create xl from DB with 3 sheets.
