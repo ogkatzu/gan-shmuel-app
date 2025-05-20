@@ -2,6 +2,9 @@ from datetime import datetime
 from sqlalchemy import text
 import sys
 
+def get_item_data(date_from, date_to):
+    
+
 def print_debug(msg: str):
     print(msg, file=sys.stdout, flush=True)
 
