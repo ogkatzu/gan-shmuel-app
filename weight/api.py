@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 import os
 import json
 from datetime import datetime
-from sqlalchemy import text
+from sqlalchemy import text, or_, and_
 import csv
 import os
 
@@ -191,7 +191,70 @@ def get_item(id):
    
     return jsonify(item_data)
 
+def find_transactions_by_container(container_id, start_time, end_time):
+    transactions = db.session.query(Transaction).filter(
+        and_(
+            Transaction.datetime >= start_time,
+            Transaction.datetime <= end_time,
+        )
+    ).all()
 
+    matching = []
+    for tx in transactions:
+        try:
+            container_list = json.loads(tx.containers)
+            if container_id in container_list:
+                matching.append(tx)
+        except (TypeError, json.JSONDecodeError):
+            continue  # skip if containers field is invalid
+
+    return matching if matching else None
+
+def find_transactions_by_id_and_time(id, start_time, end_time):
+    transactions = db.session.query(Transaction).filter(
+        and_(
+            Transaction.datetime >= start_time,
+            Transaction.datetime <= end_time,
+            or_(
+                Transaction.truck == id,
+            )
+        )
+    ).all()
+
+    if not transactions:
+        return None, None
+
+    latest_out_tara = None
+    for tx in sorted(transactions, key=lambda t: t.datetime, reverse=True):
+        if tx.direction == "out" and isinstance(tx.truckTara, int):
+            latest_out_tara = tx.truckTara
+            break
+
+    return latest_out_tara, transactions
+
+def get_item_data(date_from, date_to, id):
+    default_from = datetime.now().replace(day=1, hour=00, minute=00, second=00, microsecond=00)
+    default_to = datetime.now()
+
+    final_from = auxillary_functions.parse_date(date_string=date_from, default_date=default_from)
+    final_to = auxillary_functions.parse_date(date_string=date_to, default_date=default_to)
+
+    tara, transctions = find_transactions_by_id_and_time(id=id, start_time=final_from, end_time=final_to)
+    if transctions is None:
+        transctions = find_transactions_by_container(id=id, start_time=final_from, end_time=final_to)
+        container = db.session.query(Container).filter(Container.container_id == id).first()
+        unit, tara = auxillary_functions.lb_to_kg(unit=container.unit, weight=container.weigth)
+    
+    if transctions is None:
+        return f"ID {id} not found in requested time range.", 404
+    
+    session_ids = []
+    for transaction in transctions:
+        session_ids.append(transaction.session_id)
+    list(set(session_ids))
+    
+    ret = {"id": id, "tara": tara if tara else 'na', 'sessions': session_ids, 'unit': 'kg'}
+    return jsonify(ret), 200
 
 
 #container db model

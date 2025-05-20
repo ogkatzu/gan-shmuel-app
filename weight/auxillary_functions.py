@@ -1,35 +1,7 @@
 from datetime import datetime
-from sqlalchemy import text
+from sqlalchemy import text, or_, and_
 import sys
-
-def find_transactions_by_id_and_time(identifier, start_time_str, end_time_str):
-    # Parse the datetime strings to datetime objects
-    start_time = datetime.fromisoformat(start_time_str)
-    end_time = datetime.fromisoformat(end_time_str)
-
-    # Query for transactions with matching truck or containers
-    transactions = db.session.query(Transaction).filter(
-        and_(
-            Transaction.datetime >= start_time,
-            Transaction.datetime <= end_time,
-            or_(
-                Transaction.truck == identifier,
-                Transaction.containers.like(f'%{identifier}%')  # crude match inside string
-            )
-        )
-    ).all()
-
-    return transactions if transactions else None
-
-def get_item_data(date_from, date_to):
-    default_from = datetime.now().replace(day=1, hour=00, minute=00, second=00, microsecond=00)
-    default_to = datetime.now()
-
-    final_from = parse_date(date_string=date_from, default_date=default_from)
-    final_to = parse_date(date_string=date_to, default_date=default_to)
-
-
-    
+   
 
 def print_debug(msg: str):
     print(msg, file=sys.stdout, flush=True)
