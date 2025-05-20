@@ -7,6 +7,7 @@ import json
 import smtplib, ssl
 import logging
 import shutil
+from dotenv import load_dotenv
 
 
 
@@ -23,18 +24,16 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+load_dotenv()
 # Configuration
 CONFIG = {
-    'main_branch': 'main',
     'repo_path': os.environ.get('REPO_PATH', '/tmp/repo'),
     'test_command': os.environ.get('TEST_COMMAND', 'pytest'),
     # 'build_command': os.environ.get('BUILD_COMMAND', 'npm run build'),
     'github_secret': os.environ.get('GITHUB_SECRET', ''),
     'email_sender': os.environ.get('EMAIL_SENDER', 'ci@example.com'),
-    'email_recipients': os.environ.get('EMAIL_RECIPIENTS', 'dev@example.com').split(','),
     'smtp_server': os.environ.get('SMTP_SERVER', 'smtp.example.com'),
     'smtp_port': int(os.environ.get('SMTP_PORT', 587)),
-    'smtp_username': os.environ.get('SMTP_USERNAME', ''),
     'smtp_password': os.environ.get('SMTP_PASSWORD', ''),
     'prod_deploy_script': os.environ.get('PROD_DEPLOY_SCRIPT', 'scripts/deploy_prod.sh'),
 }
@@ -71,18 +70,36 @@ def test_env_down_and_clean():
 def run_tests():
     logger.info("Running tests")
     try:
+        # Determine which docker-compose file to use
+        docker_compose_file = os.path.join(CONFIG['repo_path'], 'docker-compose-test.yaml')
+        if not os.path.exists(docker_compose_file):
+            docker_compose_file = os.path.join(CONFIG['repo_path'], 'docker-compose-test.yml')
+        
+        # Run tests through docker-compose exec
+        # Assuming there's a main service where tests should run
+        # TODO - Update this to run tests in the correct service
+        # billing_command = 
+        wieght_command = ["pyestest", "/weight/test/test_api.py"]
+        logger.info(f"Running tests")
         result = subprocess.run(
-            CONFIG['test_command'].split(), 
+            ['docker-compose', '-f', docker_compose_file, 'exec', '-T', 'weight_app_test'] + wieght_command,
             cwd=CONFIG['repo_path'],
             capture_output=True,
             text=True
         )
+        
+        # Log test output for debugging
+        logger.info(f"Test stdout: {result.stdout}")
+        if result.stderr:
+            logger.warning(f"Test stderr: {result.stderr}")
+            
         logger.info(f"Tests completed with return code: {result.returncode}")
         return result.returncode == 0, result.stdout + result.stderr
-    except Exception as error:
-        logger.error(f"Error running tests: {str(error)}")
-        return False, str(error)
-    
+    except Exception as e:
+        logger.error(f"Error running tests: {str(e)}")
+        return False, str(e)
+
+
 
 """
 def deploy_to_production():
