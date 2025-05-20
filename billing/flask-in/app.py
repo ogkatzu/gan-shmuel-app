@@ -1,9 +1,10 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 import mysql.connector
 from mysql.connector import Error
 import pandas as pd
 from flask_sqlalchemy import SQLAlchemy
+import openpyxl
 
 app = Flask(__name__)
 
@@ -199,6 +200,81 @@ def update_truck_provider(id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/post_rates', methods=['POST'])
+def load_rates():
+    """take rates excel and convert to mysqlDB"""
+
+    file_path = '/app/rates.xlsx'
+
+    if not os.path.exists(file_path):
+        return jsonify({"error": f"File not found: {file_path}"}), 404
+
+    try:
+        df = pd.read_excel(file_path, engine='openpyxl')
+
+        # Validate columns
+        expected_columns = {'Product', 'Rate', 'Scope'}
+        if not expected_columns.issubset(df.columns):
+            return jsonify({"error": f"Missing columns. Required: {expected_columns}"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        for _, row in df.iterrows():
+            cursor.execute("""
+                INSERT INTO Rates (product_id, rate, scope)
+                VALUES (%s, %s, %s)
+            """, (row['Product'], int(row['Rate']), row['Scope']))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({"message": f"Inserted {len(df)} rows from {file_path}"}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+@app.route('/rates', methods=['GET'])
+def export_to_excel():
+    """take mysqlDB and convert it to xl"""
+
+    try:
+        # Connect to the database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Fetch data using cursor
+        def fetch_table(query):
+            cursor.execute(query)
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+            return pd.DataFrame(rows, columns=columns)
+
+        provider_df = fetch_table("SELECT * FROM Provider")
+        rates_df = fetch_table("SELECT * FROM Rates")
+        trucks_df = fetch_table("SELECT * FROM Trucks")
+
+        # File path to save the Excel file
+        file_path = os.path.join(os.getcwd(), 'temp_rates.xlsx')
+
+        # Write to Excel
+        with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+            provider_df.to_excel(writer, sheet_name='Provider', index=False)
+            rates_df.to_excel(writer, sheet_name='Rates', index=False)
+            trucks_df.to_excel(writer, sheet_name='Trucks', index=False)
+
+        # Cleanup
+        cursor.close()
+        conn.close()
+
+        return f"Excel file saved at {file_path}"
+        # replace above line, use later to download excel from website:
+        # return send_file(file_path, as_attachment=True)
+    except mysql.connector.Error as err:
+        return jsonify({"error": str(err)}), 500
 
 
 
