@@ -5,7 +5,7 @@ import os
 from sqlalchemy import text
 import csv
 
-from classes_db import db
+from classes_db import Container, Transaction
 import auxillary_functions
 
 
@@ -14,14 +14,13 @@ def register_routes(app):
     @app.route("/")
     def index():
         return render_template("index.html")
-    
 
-    # if session has both in and out - return only from the out
     @app.route('/session/<int:session_id>', methods=['GET'])
     def get_session(session_id):
-        tx = Transaction.query.get(session_id).all()
-        if not tx:
+        tx_list = Transaction.query.filter_by(session_id=session_id).all()
+        if not tx_list:
             return jsonify({'error': 'Not found'}), 404
+        tx = next((t for t in tx_list if t.direction == 'out'), tx_list[0])
         result = {
             'id': tx.id,
             'truck': tx.truck,
