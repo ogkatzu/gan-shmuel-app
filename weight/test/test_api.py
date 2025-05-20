@@ -7,7 +7,7 @@ BASE_URL = "http://localhost:5000"  # Adjust according to your environment
 def test_health():
     response = requests.get(f"{BASE_URL}/health")
     assert response.status_code == 200
-    assert response.json() == "OK"
+    assert response.json() == {"status": "OK"}
 
 
 def test_get_weight_default():
