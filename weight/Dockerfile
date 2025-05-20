@@ -2,10 +2,10 @@ FROM python:3.11-alpine
 
 WORKDIR /app
 
-COPY api.py /app/
-COPY requirements.txt /app/
-#COPY .env app/
-#COPY templates/ /app/templates/
+COPY api.py requirements.txt auxillary_functions.py /app/
+COPY templates/ /app/templates/
+COPY test/ /app/test/
+
 
 RUN pip install --no-cache-dir -r requirements.txt
 
