@@ -9,7 +9,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
     rm -rf /root/.cache
 
 # Copy the rest of the app code
-COPY app.py entrypoint.sh in/ /app/
+COPY app.py entrypoint.sh /app/
+COPY ./in/ /app/in/
 RUN chmod +x ./entrypoint.sh
 
 # EXPOSE is for documentation purposes only.

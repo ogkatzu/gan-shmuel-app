@@ -13,6 +13,7 @@ services:
       - "5500:5500"
     volumes:
       - billing-files:/app/in     # Input files directory for Excel uploads
+      - ./billing/flask-in/in/:/app/in  # Mount the "in" directory containing rates.xlsx
     depends_on:
       - billdb
     networks:
