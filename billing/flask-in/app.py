@@ -9,7 +9,7 @@ import openpyxl
 app = Flask(__name__)
 
 # both used by "rates" functions:
-XL_DB_IN = "./rates.xlsx"
+XL_DB_IN = "./in/rates.xlsx"
 XL_DB_OUT = os.path.join(os.getcwd(), 'temp_rates.xlsx')
 
 # ready Macros still not in use:
