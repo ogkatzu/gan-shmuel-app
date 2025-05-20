@@ -9,8 +9,8 @@ import openpyxl
 app = Flask(__name__)
 
 # both used by "rates" functions:
-XL_DB_IN = "./flask-in/rates.xlsx"
-# XL_DB_OUT = os.path.join(os.getcwd(), 'temp_rates.xlsx') # cant be use - as it create new excell file.
+XL_DB_IN = "./rates.xlsx"
+XL_DB_OUT = os.path.join(os.getcwd(), 'temp_rates.xlsx')
 
 # ready Macros still not in use:
 # DB_IN = "db/in/"
@@ -273,11 +273,8 @@ def export_to_excel():
         rates_df = fetch_table("SELECT * FROM Rates")
         trucks_df = fetch_table("SELECT * FROM Trucks")
 
-        # File path to save the Excel file
-        file_path = os.path.join(os.getcwd(), 'temp_rates.xlsx')
-
         # Write to Excel
-        with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+        with pd.ExcelWriter(XL_DB_OUT, engine='openpyxl') as writer:
             provider_df.to_excel(writer, sheet_name='Provider', index=False)
             rates_df.to_excel(writer, sheet_name='Rates', index=False)
             trucks_df.to_excel(writer, sheet_name='Trucks', index=False)
@@ -286,7 +283,7 @@ def export_to_excel():
         cursor.close()
         conn.close()
 
-        return f"Excel file saved at {file_path}"
+        return f"Excel file saved at {XL_DB_OUT}"
         # replace above line, use later to download excel from website:
         # return send_file(file_path, as_attachment=True)
     except mysql.connector.Error as err:
