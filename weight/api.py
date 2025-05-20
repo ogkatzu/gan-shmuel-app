@@ -16,9 +16,9 @@ db = os.environ.get("MYSQL_DATABASE")
 #set db uri from environment
 app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{user}:{password}@{host}/{db}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-
 db = SQLAlchemy(app)
+
+
 @app.route('/weight', methods=['GET'])
 def get_weight():
     # get request parameters
@@ -32,6 +32,24 @@ def get_weight():
     #Return results in JSON format
 
     return jsonify(transactions)
+
+
+@app.route('/item/<id>', methods=['GET'])
+def get_item(id):
+    
+    from_date = request.args.get('from')
+    to_date = request.args.get('to')
+    
+    
+    item_data = auxillary_functions.get_item_data()
+    
+   
+    if item_data is None:
+        return jsonify({"error": "Item not found"}), 404
+    
+   
+    return jsonify(item_data)
+
 
 
 
