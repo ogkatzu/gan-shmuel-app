@@ -10,8 +10,8 @@ services:
       weight_db:
        condition: service_healthy
     volumes:
-      - .:/app
-      - ./in:/in
+      # - .:/app
+      - ./in:/app/in
     env_file:
       - .env
 
