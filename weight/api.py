@@ -1,11 +1,6 @@
-from flask import Flask, request, jsonify,render_template
-from flask_sqlalchemy import SQLAlchemy
-import os
-from datetime import datetime
-from sqlalchemy import text, or_, and_
+from flask import Flask
 import os
 
-import auxillary_functions 
 from classes_db import db
 from routes import register_routes
 
@@ -16,9 +11,9 @@ def create_app():
     user = os.environ.get('MYSQL_USER')
     password = os.environ.get('MYSQL_PASSWORD')
     host = os.environ.get('MYSQL_HOST')
-    db = os.environ.get('MYSQL_DATABASE')
+    db_name = os.environ.get('MYSQL_DATABASE')
     #set db uri from environment
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{user}:{password}@{host}/{db}'
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{user}:{password}@{host}/{db_name}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     db.init_app(app)
