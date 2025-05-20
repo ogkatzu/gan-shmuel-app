@@ -9,6 +9,7 @@ import os
 
 import auxillary_functions 
 
+
 def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_time, id):
     new_transaction = Transaction()
     new_transaction.id = id
@@ -156,6 +157,28 @@ direction_handler = {'in': _truck_direction.truck_in, 'out': _truck_direction.tr
 
 db = SQLAlchemy(app)
 
+#container db model
+class Container(db.Model):
+    __tablename__ = 'containers_registered'
+    container_id = db.Column(db.String(15), primary_key=True)
+    weight = db.Column(db.Integer)
+    unit = db.Column(db.String(10))
+
+
+#transaction db model
+class Transaction(db.Model):
+    __tablename__ = 'transactions'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    datetime = db.Column(db.DateTime, default=datetime)
+    direction = db.Column(db.String(10))
+    truck = db.Column(db.String(50))
+    containers = db.Column(db.String(10000))
+    bruto = db.Column(db.Integer)
+    truckTara = db.Column(db.Integer)
+    neto = db.Column(db.Integer)
+    produce = db.Column(db.String(50))
+    session_id = db.Column(db.Integer)
+
 @app.route('/item/<id>', methods=['GET'])
 def get_item(id):
     
@@ -219,9 +242,9 @@ def get_item_data(date_from, date_to, id):
 
     tara, transctions = find_transactions_by_id_and_time(id=id, start_time=final_from, end_time=final_to)
     if transctions is None:
-        transctions = find_transactions_by_container(id=id, start_time=final_from, end_time=final_to)
-        container = db.session.query(Container).filter(Container.container_id == id).first()
-        unit, tara = auxillary_functions.lb_to_kg(unit=container.unit, weight=container.weigth)
+        transctions = find_transactions_by_container(container_id=id, start_time=final_from, end_time=final_to)
+        container: Container = db.session.query(Container).filter(Container.container_id == id).first()
+        unit, tara = auxillary_functions.lb_to_kg(unit=container.unit, weight=container.weight)
     
     if transctions is None:
         return f"ID {id} not found in requested time range.", 404
@@ -229,33 +252,21 @@ def get_item_data(date_from, date_to, id):
     session_ids = []
     for transaction in transctions:
         session_ids.append(transaction.session_id)
+    auxillary_functions.print_debug(f"len of sessions id list at first: {len(session_ids)}")
+    auxillary_functions.print_debug(f"session id list is: {session_ids}")
     list(set(session_ids))
+    auxillary_functions.print_debug(f"after set, list len is {len(session_ids)}")
+    auxillary_functions.print_debug(f"after set, list is {session_ids}")
+    for _item in session_ids:
+        if _item is None:
+            session_ids.remove(_item)
+    auxillary_functions.print_debug(f"after None removal, list len is {len(session_ids)}")
+    auxillary_functions.print_debug(f"after None remova, list is {session_ids}")
     
     ret = {"id": id, "tara": tara if tara else 'na', 'sessions': session_ids, 'unit': 'kg'}
     return ret
 
 
-#container db model
-class Container(db.Model):
-    __tablename__ = 'containers_registered'
-    container_id = db.Column(db.String(15), primary_key=True)
-    weight = db.Column(db.Integer)
-    unit = db.Column(db.String(10))
-
-
-#transaction db model
-class Transaction(db.Model):
-    __tablename__ = 'transactions'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    datetime = db.Column(db.DateTime, default=datetime)
-    direction = db.Column(db.String(10))
-    truck = db.Column(db.String(50))
-    containers = db.Column(db.String(10000))
-    bruto = db.Column(db.Integer)
-    truckTara = db.Column(db.Integer)
-    neto = db.Column(db.Integer)
-    produce = db.Column(db.String(50))
-    session_id = db.Column(db.Integer)
 
 @app.route("/")
 def index():
@@ -429,14 +440,12 @@ def get_unknown():
         # Iterates over all transactions
         if tx.containers:  
             # Checks if the transaction has any container IDs listed
-            for cid in tx.containers.split(","):  
-                # Splits the container string (assumed to be comma-separated IDs)
-                cid = cid.strip()  
-                # Removes any leading/trailing whitespace from the container ID
+            for cid in json.loads(tx.containers):  
                 if cid and not Container.query.get(cid):  
                     # Checks if the ID is non-empty AND does NOT exist in the Container table
                     ids.add(cid)  
                     # Adds the container ID to the set of unknown containers
+  
     return jsonify(list(ids))  
     # Converts the set of unknown IDs into a list and returns it as a JSON response
 
