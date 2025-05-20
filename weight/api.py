@@ -1,10 +1,8 @@
 from flask import Flask, request, jsonify,render_template
 from flask_sqlalchemy import SQLAlchemy
 import os
-import json
 from datetime import datetime
 from sqlalchemy import text, or_, and_
-import csv
 import os
 
 import auxillary_functions 
@@ -22,9 +20,6 @@ def create_app():
     #set db uri from environment
     app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{user}:{password}@{host}/{db}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    _truck_direction = truck_direction
-    direction_handler = {'in': _truck_direction.truck_in, 'out': _truck_direction.truck_out, 'none': _truck_direction.truck_none}
-
 
     db.init_app(app)
     register_routes(app)
