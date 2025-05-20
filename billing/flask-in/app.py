@@ -8,8 +8,19 @@ import openpyxl
 
 app = Flask(__name__)
 
+# both used by "rates" functions:
+XL_DB_IN = "./flask-in/rates.xlsx"
+# XL_DB_OUT = os.path.join(os.getcwd(), 'temp_rates.xlsx') # cant be use - as it create new excell file.
+
+# ready Macros still not in use:
+# DB_IN = "db/in/"
+# DB_OUT = "db/out/"
+# APP_IN_NETWORK = "flask/in/"  # will use for network between docker
+# APP_OUT_NETWORK = "flask/out/"
+
 
 def get_db_connection():
+    """ "connector" to mysql DB"""
     return mysql.connector.connect(
         host=os.environ.get("MYSQL_HOST", "localhost"),
         user=os.environ.get("MYSQL_USER", "root"),
@@ -30,6 +41,7 @@ def health():
 
 @app.route("/provider", methods=["POST"])
 def create_provider():
+    """Admin registers a new provider. System validates uniqueness and stores in billdb."""
     try:
         data = request.get_json()
         name = data.get("name")
@@ -50,6 +62,7 @@ def create_provider():
 
 @app.route("/provider/<int:provider_id>", methods=["PUT"])
 def update_provider(provider_id):
+    """Admin updates provider details. Requires valid existing ID."""
     try:
         data = request.get_json()
         name = data.get("name")
@@ -76,6 +89,7 @@ def update_provider(provider_id):
 
 @app.route('/post_truck', methods=['POST'])
 def post_truck():
+    """Admin links a truck to a provider ID in the system."""
     data = request.get_json()
 
     if not data:
@@ -96,6 +110,7 @@ def post_truck():
 
 @app.route('/get_truck', methods=['GET'])
 def get_truck():
+    """BONUS (we didnt required to) - historical of all tracks"""
     product = request.args.get('Product')
     rate = request.args.get('Rate')
     scope = request.args.get('Scope')
@@ -110,6 +125,7 @@ def get_truck():
 
 @app.route('/get_truck/<truck_id>', methods=['GET'])
 def get_truck_id(truck_id):
+    """Used by producer to query historical data for a truck."""
     # You can still get optional query params if needed
     product = request.args.get('Product')
     rate = request.args.get('Rate')
@@ -126,6 +142,7 @@ def get_truck_id(truck_id):
 
 @app.route("/truck", methods=["POST"])
 def register_truck():
+    """2nd implemantation for that function (we have it implemented above)"""
     try:
         data = request.json
         truck_id = data.get("id")
@@ -166,6 +183,7 @@ def register_truck():
 
 @app.route("/truck/<id>", methods=["PUT"])
 def update_truck_provider(id):
+    """Admin updates provider linkage for a truck already in the system."""
     try:
         data = request.json
         new_provider_id = data.get("provider")
@@ -200,81 +218,79 @@ def update_truck_provider(id):
         return jsonify({"error": str(e)}), 500
 
 
-# @app.route('/post_rates', methods=['POST'])
-# def load_rates():
-#     """take rates excel and convert to mysqlDB"""
+@app.route('/post_rates', methods=['POST'])
+def load_rates():
+    """take "rates.xlsx" and convert to mysqlDB"""
 
-#     file_path = '/app/rates.xlsx'
+    if not os.path.exists(XL_DB_IN):
+        return jsonify({"error": f"File not found: {XL_DB_IN}"}), 404
 
-#     if not os.path.exists(file_path):
-#         return jsonify({"error": f"File not found: {file_path}"}), 404
+    try:
+        df = pd.read_excel(XL_DB_IN, engine='openpyxl')
 
-#     try:
-#         df = pd.read_excel(file_path, engine='openpyxl')
+        # Validate columns
+        expected_columns = {'Product', 'Rate', 'Scope'}
+        if not expected_columns.issubset(df.columns):
+            return jsonify({"error": f"Missing columns. Required: {expected_columns}"}), 400
 
-#         # Validate columns
-#         expected_columns = {'Product', 'Rate', 'Scope'}
-#         if not expected_columns.issubset(df.columns):
-#             return jsonify({"error": f"Missing columns. Required: {expected_columns}"}), 400
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-#         conn = get_db_connection()
-#         cursor = conn.cursor()
+        for _, row in df.iterrows():
+            cursor.execute("""
+                INSERT INTO Rates (product_id, rate, scope)
+                VALUES (%s, %s, %s)
+            """, (row['Product'], int(row['Rate']), row['Scope']))
 
-#         for _, row in df.iterrows():
-#             cursor.execute("""
-#                 INSERT INTO Rates (product_id, rate, scope)
-#                 VALUES (%s, %s, %s)
-#             """, (row['Product'], int(row['Rate']), row['Scope']))
+        conn.commit()
+        cursor.close()
+        conn.close()
 
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
+        return jsonify({"message": f"Inserted {len(df)} rows from {XL_DB_IN}"}), 200
 
-#         return jsonify({"message": f"Inserted {len(df)} rows from {file_path}"}), 200
-
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 
-# @app.route('/rates', methods=['GET'])
-# def export_to_excel():
-#     """take mysqlDB and convert it to xl"""
+@app.route('/rates', methods=['GET'])
+def export_to_excel():
+    """take mysqlDB and convert it to "outer.xlsx" """
 
-#     try:
-#         # Connect to the database
-#         conn = get_db_connection()
-#         cursor = conn.cursor()
+    try:
+        # Connect to the database
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-#         # Fetch data using cursor
-#         def fetch_table(query):
-#             cursor.execute(query)
-#             columns = [col[0] for col in cursor.description]
-#             rows = cursor.fetchall()
-#             return pd.DataFrame(rows, columns=columns)
+        # Fetch data using cursor
+        def fetch_table(query):
+            cursor.execute(query)
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+            return pd.DataFrame(rows, columns=columns)
 
-#         provider_df = fetch_table("SELECT * FROM Provider")
-#         rates_df = fetch_table("SELECT * FROM Rates")
-#         trucks_df = fetch_table("SELECT * FROM Trucks")
+        provider_df = fetch_table("SELECT * FROM Provider")
+        rates_df = fetch_table("SELECT * FROM Rates")
+        trucks_df = fetch_table("SELECT * FROM Trucks")
 
-#         # File path to save the Excel file
-#         file_path = os.path.join(os.getcwd(), 'temp_rates.xlsx')
+        # File path to save the Excel file
+        file_path = os.path.join(os.getcwd(), 'temp_rates.xlsx')
 
-#         # Write to Excel
-#         with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
-#             provider_df.to_excel(writer, sheet_name='Provider', index=False)
-#             rates_df.to_excel(writer, sheet_name='Rates', index=False)
-#             trucks_df.to_excel(writer, sheet_name='Trucks', index=False)
+        # Write to Excel
+        with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+            provider_df.to_excel(writer, sheet_name='Provider', index=False)
+            rates_df.to_excel(writer, sheet_name='Rates', index=False)
+            trucks_df.to_excel(writer, sheet_name='Trucks', index=False)
 
-#         # Cleanup
-#         cursor.close()
-#         conn.close()
+        # Cleanup
+        cursor.close()
+        conn.close()
 
-#         return f"Excel file saved at {file_path}"
-#         # replace above line, use later to download excel from website:
-#         # return send_file(file_path, as_attachment=True)
-#     except mysql.connector.Error as err:
-#         return jsonify({"error": str(err)}), 500
+        return f"Excel file saved at {file_path}"
+        # replace above line, use later to download excel from website:
+        # return send_file(file_path, as_attachment=True)
+    except mysql.connector.Error as err:
+        return jsonify({"error": str(err)}), 500
 
 
 

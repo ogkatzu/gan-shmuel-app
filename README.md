@@ -44,3 +44,16 @@ api-test
 
 ## Before pushing changes:
 Always run api-test and check logs/api.log to ensure there are no errors or crashes in your code.
+
+
+## app file python code need to check:
+    not checked yet:
+    POST rates + GET rates
+
+    POST Truck - implemented twice - choose what is better.
+
+    neet to do:
+    1. GET /item/<id>
+    2. GET /session/<id>
+    3. GET /weight
+    4. GET /bill/<id>
