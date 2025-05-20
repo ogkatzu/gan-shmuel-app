@@ -4,7 +4,7 @@ services:
     container_name: billing-app
     working_dir: /app
     volumes:
-      - ./billing_test/flask-in:/app
+      - ./billing/flask-in:/app
     command: /bin/sh -c "pip install --no-cache-dir -r requirements.txt && flask run --host=0.0.0.0 --port=5002"
     environment:
       - FLASK_APP=app.py
@@ -30,13 +30,12 @@ services:
     ports:
       - 8084:3306
     volumes:
-      - ./billing_test/billdb:/docker-entrypoint-initdb.d
-      - ./test_env_results:/test_env_results
+      - ./billing/billdb:/docker-entrypoint-initdb.d
     networks:
       - gan_shmuel_test_billing
 
   weight_app_test:
-    build: ./weight_test
+    build: ./weight
     ports:
       - "5000:5000"
     environment:
@@ -50,8 +49,8 @@ services:
       weight_db_test:
        condition: service_healthy
     volumes:
-      - ./weight_test:/app
-      - ./weight_test/in:/in
+      - ./weight:/app
+      - ./weight/in:/in
     networks:
       - gan_shmuel_test_apps
       - gan_shmuel_test_weight
@@ -66,8 +65,8 @@ services:
       MYSQL_PASSWORD: 123
       MYSQL_HOST: weight_db_test
     volumes:
-      - ./weight_test/weightdb.sql:/docker-entrypoint-initdb.d/weightdb.sql  # Mount the SQL file
-      - ./weight_test/db_data:/var/lib/mysql
+      - ./weight/weightdb.sql:/docker-entrypoint-initdb.d/weightdb.sql  # Mount the SQL file
+      - ./weight/db_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
