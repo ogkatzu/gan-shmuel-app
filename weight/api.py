@@ -8,21 +8,8 @@ import csv
 import os
 
 import auxillary_functions 
+from classes_db import db
 
-
-def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_time, id):
-    new_transaction = Transaction()
-    new_transaction.id = id
-    new_transaction.bruto = in_json['bruto']
-    new_transaction.containers = json.dumps(in_json['containers'])
-    new_transaction.datetime = exact_time
-    new_transaction.direction = 'out'
-    new_transaction.produce = in_json['produce']
-    new_transaction.truck = in_json['truck']
-    new_transaction.session_id = in_json['session_id']
-    new_transaction.neto = neto
-    new_transaction. truckTara = truck_tara
-    return new_transaction
 
 def transaction_to_dict(transaction):
     if not isinstance(transaction.datetime, datetime):
@@ -142,42 +129,27 @@ class truck_direction():
         return ret, 200
         
 
+def create_app():
+    app = Flask(__name__, template_folder='templates')
+    # enviromental/global vars go here
+    user = os.environ.get('MYSQL_USER')
+    password = os.environ.get('MYSQL_PASSWORD')
+    host = os.environ.get('MYSQL_HOST')
+    db = os.environ.get('MYSQL_DATABASE')
+    #set db uri from environment
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{user}:{password}@{host}/{db}'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    _truck_direction = truck_direction
+    direction_handler = {'in': _truck_direction.truck_in, 'out': _truck_direction.truck_out, 'none': _truck_direction.truck_none}
 
-app = Flask(__name__, template_folder='templates')
-# enviromental/global vars go here
-user = os.environ.get('MYSQL_USER')
-password = os.environ.get('MYSQL_PASSWORD')
-host = os.environ.get('MYSQL_HOST')
-db = os.environ.get('MYSQL_DATABASE')
-#set db uri from environment
-app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{user}:{password}@{host}/{db}'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-_truck_direction = truck_direction
-direction_handler = {'in': _truck_direction.truck_in, 'out': _truck_direction.truck_out, 'none': _truck_direction.truck_none}
-
-db = SQLAlchemy(app)
-
-#container db model
-class Container(db.Model):
-    __tablename__ = 'containers_registered'
-    container_id = db.Column(db.String(15), primary_key=True)
-    weight = db.Column(db.Integer)
-    unit = db.Column(db.String(10))
+    db.init_app(app)
+    with app.app_context():
+        from classes_db import Container, Transaction 
+        db.create_all()
+    
+    return app
 
 
-#transaction db model
-class Transaction(db.Model):
-    __tablename__ = 'transactions'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    datetime = db.Column(db.DateTime, default=datetime)
-    direction = db.Column(db.String(10))
-    truck = db.Column(db.String(50))
-    containers = db.Column(db.String(10000))
-    bruto = db.Column(db.Integer)
-    truckTara = db.Column(db.Integer)
-    neto = db.Column(db.Integer)
-    produce = db.Column(db.String(50))
-    session_id = db.Column(db.Integer)
 
 @app.route('/item/<id>', methods=['GET'])
 def get_item(id):
@@ -286,10 +258,10 @@ def get_weight():
 
     return jsonify(transactions)
 
-
+# if session has both in and out - return only from the out
 @app.route('/session/<int:session_id>', methods=['GET'])
 def get_session(session_id):
-    tx = Transaction.query.get(session_id)
+    tx = Transaction.query.get(session_id).all()
     if not tx:
         return jsonify({'error': 'Not found'}), 404
     result = {
@@ -475,7 +447,6 @@ def get_transactions():
 
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
+    app = create_app()
     app.run(host='0.0.0.0', port=5000)
 
