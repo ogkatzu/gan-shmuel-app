@@ -127,7 +127,24 @@ class truck_direction():
         db.session.commit()
         ret = {'id': new_transaction.id, 'truck': new_transaction.truck, 'bruto': new_transaction.bruto, 'truckTara': new_transaction.truckTara, 'neto': new_transaction.neto}
         return ret, 200
-
+    
+    def truck_none(data: json):
+        # none after in should generate an error. Why? What does it mean?
+        new_tansaction = Transaction()
+        new_tansaction.bruto = data['weight']
+        container = containers = db.session.query(Container).filter_by(container_id=container_id).first()
+        unit, container_tara = lb_to_kg(container.unit ,container.weight)
+        new_tansaction.truckTara = container_tara #should this be the case?
+        new_tansaction.containers = [container]
+        new_tansaction.neto = new_tansaction.bruto - container_tara
+        new_tansaction.id = new_tansaction.session_id = create_session_id(data['datetime'])
+        new_tansaction.direction = 'none'
+        new_tansaction.produce = data['produce']
+        new_tansaction.truck = 'na'
+        db.session.add(new_transaction)
+        db.session.commit()
+        ret = {'id': new_transaction.id, 'truck': new_transaction.truck, 'bruto': new_transaction.bruto, 'truckTara': new_transaction.truckTara, 'neto': new_transaction.neto}
+        
 
 
     def truck_none(data: json):
