@@ -2,7 +2,7 @@
 import pytest
 import requests
 
-BASE_URL = "http://localhost:5000"  # Adjust according to your environment
+BASE_URL = "http://weight-weight_app-1:5000"  # Adjust according to your environment
 
 def test_health():
     response = requests.get(f"{BASE_URL}/health")
