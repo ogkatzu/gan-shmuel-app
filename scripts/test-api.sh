@@ -55,5 +55,5 @@ run_api_test "Register Truck (nonexistent provider)" \
 
 
 # === Rates Tests ===
-# run_api_test "POST truck (convert xl to mysql)" \
-# 'curl -s -X POST http://localhost:5000/load_rates '
+run_api_test "POST truck (convert xl to mysql)" \
+'curl -s -X POST http://127.0.0.1:5500/post_rates'

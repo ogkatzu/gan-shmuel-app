@@ -3,7 +3,8 @@ from flask import Flask, request, jsonify, send_file
 import mysql.connector
 from mysql.connector import Error
 import pandas as pd
-from flask_sqlalchemy import SQLAlchemy
+# from flask_sqlalchemy import SQLAlchemy
+import openpyxl
 
 app = Flask(__name__)
 
@@ -203,7 +204,7 @@ def update_truck_provider(id):
 def load_rates():
     """take rates excel and convert to mysqlDB"""
 
-    file_path = './flask-in/rates.xlsx'
+    file_path = '/app/rates.xlsx'
 
     if not os.path.exists(file_path):
         return jsonify({"error": f"File not found: {file_path}"}), 404
