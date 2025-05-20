@@ -1,42 +1,74 @@
+# Python virtual environment
+.venv/
+venv/
+env/
+
 # Test output
+.pytest_cache/
+coverage.xml
+htmlcov/
+junit.xml
+nosetests.xml
+
+# Byte-compiled / cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs and temporary files
+*.bak
+*.lock
+*.log
+*.pid
+*.tmp
+*.orig
+*.rej
+
+# Secrets and certificates
+*.key
+*.pem
+cert.*
+key.*
+container-resources/**/secret/
+container-resources/**/nginx/cert/
 secret/
 nginx/cert/
-htmlcov/
-.pytest_cache/
-node_modules/
-dist/
-build/
+
+# Editor / IDE configs
+.idea/
+.vscode/
+*.swo
+*.swp
+*.code-workspace
+
+# Env files
+.env
+*.env
+*.env.*
+
+# Docker artifacts
 docker-volume/
 volumes/
 data/
-.vscode/
-.idea/
-__pycache__/
-.venv/
-venv/
+*.tar
+*.img
 
-# files:
-*.env
-*.env.*
-ehthumbs.db
-desktop.ini
-*.orig
-*.rej
-*.log
-*.tmp
-*.bak
-coverage.xml
-nosetests.xml
-junit.xml
-*.pyc
-*.pyo
-*.pem
-*.key
+# System files
 .DS_Store
 Thumbs.db
-*.swp
-*.swo
-.mypy_cache/
+ehthumbs.db
+desktop.ini
 
-#env
-.env
+# MySQL dumps & backups
+*.sql~
+*~
+
+# Node.js / frontend
+node_modules/
+dist/
+build/
+
+# Python packaging
+*.egg
+*.egg-info/
+build/
