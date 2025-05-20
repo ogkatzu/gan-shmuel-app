@@ -11,6 +11,6 @@ sleep 15
 echo "[ENTRYPOINT] Proceeding to start Flask app"
 
 # Start Flask in host mode
-exec flask run --host=0.0.0.0 --port=5000
+exec flask run --host=0.0.0.0 --port=5500
 
 
