@@ -1,0 +1,8 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-8.3.5, pluggy-1.6.0
+rootdir: /home/yarden/develeap/gan-shmuel/test_env/weight_test/test
+collected 3 items
+
+test_api.py ...                                                          [100%]
+
+============================== 3 passed in 0.06s ===============================
