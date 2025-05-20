@@ -1,5 +1,4 @@
 # --- Implemented by Dalit Verner ---
-version: '3.8'
 
 services:
   weight_app:

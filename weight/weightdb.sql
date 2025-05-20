@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS `transactions` (
   --   "neto": <int> or "na" // na if some of containers unknown
   `neto` int(12) DEFAULT NULL,
   `produce` varchar(50) DEFAULT NULL,
+  'session_id' int(12)
   PRIMARY KEY (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=10001 ;
 
