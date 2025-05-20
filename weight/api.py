@@ -6,6 +6,12 @@ from datetime import datetime
 from sqlalchemy import text
 import csv
 import sys # for debug
+from flask import Flask, request, jsonify,render_template
+from flask_sqlalchemy import SQLAlchemy
+import pymysql
+import os
+
+import auxillary_functions 
 
 def print_debug(msg: str):
     print(msg, file=sys.stdout, flush=True)
@@ -167,12 +173,15 @@ direction_handler = {'in': _truck_direction.truck_in, 'out': _truck_direction.tr
 
 db = SQLAlchemy(app)
 
+
+
 #container db model
 class Container(db.Model):
     __tablename__ = 'containers_registered'
     container_id = db.Column(db.String(15), primary_key=True)
     weight = db.Column(db.Integer)
     unit = db.Column(db.String(10))
+
 
 #transaction db model
 class Transaction(db.Model):
@@ -188,10 +197,24 @@ class Transaction(db.Model):
     produce = db.Column(db.String(50))
     session_id = db.Column(db.Integer)
 
+@app.route("/")
+def index():
+    return render_template("index.html")
 
 @app.route('/weight', methods=['GET'])
 def get_weight():
-    return 'some value'
+    # get request parameters
+    from_time = request.args.get('from')
+    to_time = request.args.get('to')
+    filter_directions = request.args.get('filter')
+
+    #Call auxiliary function to get data
+    transactions = auxillary_functions.get_transactions_by_time_range(db.session,Transaction,from_time, to_time, filter_directions)
+
+    #Return results in JSON format
+
+    return jsonify(transactions)
+
 
 @app.route('/session/<int:session_id>', methods=['GET'])
 def get_session(session_id):
@@ -207,6 +230,7 @@ def get_session(session_id):
         result['truckTara'] = tx.truckTara
         result['neto'] = tx.neto if tx.neto is not None else 'na'
     return jsonify(result)
+
 
 @app.route('/db-check', methods=['GET'])
 def db_check():
@@ -234,7 +258,8 @@ def post_weight():
     ret = direction_handler[data['direction']](data)
     return ret
 
-@app.route('/batch-weight', methods=['POST'])
+
+@app.route("/batch-weight", methods=["POST"])
 def batch_weight():
     # Debug print to check received JSON payload
     print('Received JSON:', request.get_json())
@@ -315,11 +340,73 @@ def batch_weight():
     # Catch and return any unexpected errors
     except Exception as e:
         return jsonify({'error': 'An error occurred', 'details': str(e)}), 500
+    
+@app.route("/unknown", methods=["GET"])  
+def get_unknown():
+    unknown = Transaction.query.all()  
+    # Retrieves all records from the Transaction table in the database
+    ids = set()  
+    # Initializes an empty set to store container IDs that are considered "unknown" (i.e., not found in the Container table).
+    # A set is used to automatically avoid duplicates.
+    for tx in unknown:  
+        # Iterates over all transactions
+        if tx.containers:  
+            # Checks if the transaction has any container IDs listed
+            for cid in tx.containers.split(","):  
+                # Splits the container string (assumed to be comma-separated IDs)
+                cid = cid.strip()  
+                # Removes any leading/trailing whitespace from the container ID
+                if cid and not Container.query.get(cid):  
+                    # Checks if the ID is non-empty AND does NOT exist in the Container table
+                    ids.add(cid)  
+                    # Adds the container ID to the set of unknown containers
+    return jsonify(list(ids))  
+    # Converts the set of unknown IDs into a list and returns it as a JSON response
+
+@app.route("/transactions", methods=["GET"])
+def get_transactions():
+    transactions = Transaction.query.all()
+    transactions_list = [
+        {
+            "id": t.id,
+            "datetime": t.datetime,
+            "direction": t.direction,
+            "truck": t.truck,
+            "containers": t.containers,
+            "bruto": t.bruto,
+            "truckTara": t.truckTara,
+            "neto": t.neto,
+            "produce": t.produce
+        }
+        for t in transactions
+    ]
+    return jsonify({
+        "count": len(transactions_list),
+        "transactions": transactions_list
+    })
+
+@app.route("/containers", methods=["GET"])
+def get_containers():
+    containers = Container.query.all()
+    containers_list = [
+        {
+            "container_id": c.container_id,
+            "weight": c.weight,
+            "unit": c.unit
+        }
+        for c in containers
+    ]
+    return jsonify({
+        "count": len(containers_list),
+        "containers": containers_list
+    })
+
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)
+
 
 
 
