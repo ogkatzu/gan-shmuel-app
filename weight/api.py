@@ -3,11 +3,12 @@ from flask_sqlalchemy import SQLAlchemy
 import os
 import json
 from datetime import datetime
-from sqlalchemy import text
+from sqlalchemy import text, or_, and_
 import csv
 import os
 
 import auxillary_functions 
+
 
 def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_time, id):
     new_transaction = Transaction()
@@ -25,7 +26,7 @@ def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_tim
 
 def transaction_to_dict(transaction):
     if not isinstance(transaction.datetime, datetime):
-        transaction.datetime = datetime.strptime(transaction.datetime, "%Y-%m-%dT%H:%M:%S")
+        transaction.datetime = datetime.strptime(transaction.datetime, '%Y%m%d%H%M%S')
     return {
         'id': transaction.id,           
         'datetime': transaction.datetime.isoformat() if transaction.datetime else None,
@@ -122,7 +123,6 @@ class truck_direction():
     
     def truck_none(data: json):
                 # none after in should generate an error. Why? What does it mean?
-        auxillary_functions.print_debug(f"entered truck_none")
         new_tansaction = Transaction()
         new_tansaction.bruto = data['weight']
         container_id = data['containers'][0] # אthis implementation of none only accepts single container
@@ -136,11 +136,9 @@ class truck_direction():
         new_tansaction.produce = data['produce']
         new_tansaction.truck = 'na'
         new_tansaction.datetime = data['datetime']
-        auxillary_functions.print_debug(f"new transaction done: {new_tansaction}")
         db.session.add(new_tansaction)
         db.session.commit()
         ret = {'id': new_tansaction.id, 'truck': new_tansaction.truck, 'bruto': new_tansaction.bruto, 'truckTara': new_tansaction.truckTara, 'neto': new_tansaction.neto}
-        auxillary_functions.print_debug(f"ret is {ret}")
         return ret, 200
         
 
@@ -158,8 +156,6 @@ _truck_direction = truck_direction
 direction_handler = {'in': _truck_direction.truck_in, 'out': _truck_direction.truck_out, 'none': _truck_direction.truck_none}
 
 db = SQLAlchemy(app)
-
-
 
 #container db model
 class Container(db.Model):
@@ -182,6 +178,95 @@ class Transaction(db.Model):
     neto = db.Column(db.Integer)
     produce = db.Column(db.String(50))
     session_id = db.Column(db.Integer)
+
+@app.route('/item/<id>', methods=['GET'])
+def get_item(id):
+    
+    from_date = request.args.get('from')
+    to_date = request.args.get('to')
+    
+    item_data = get_item_data(date_from=from_date, date_to=to_date, id=id)
+    
+    if item_data is None:
+        return jsonify({"error": "Item not found"}), 404
+    
+    return jsonify(item_data), 200
+
+def find_transactions_by_container(container_id, start_time, end_time):
+    transactions = db.session.query(Transaction).filter(
+        and_(
+            Transaction.datetime >= start_time,
+            Transaction.datetime <= end_time,
+        )
+    ).all()
+
+    matching = []
+    for tx in transactions:
+        try:
+            container_list = json.loads(tx.containers)
+            if container_id in container_list:
+                matching.append(tx)
+        except (TypeError, json.JSONDecodeError):
+            continue  # skip if containers field is invalid
+
+    return matching if matching else None
+
+def find_transactions_by_id_and_time(id, start_time, end_time):
+    transactions = db.session.query(Transaction).filter(
+        and_(
+            Transaction.datetime >= start_time,
+            Transaction.datetime <= end_time,
+            or_(
+                Transaction.truck == id,
+            )
+        )
+    ).all()
+
+    if not transactions:
+        return None, None
+
+    latest_out_tara = None
+    for tx in sorted(transactions, key=lambda t: t.datetime, reverse=True):
+        if tx.direction == "out" and isinstance(tx.truckTara, int):
+            latest_out_tara = tx.truckTara
+            break
+
+    return latest_out_tara, transactions
+
+def get_item_data(date_from, date_to, id):
+    default_from = datetime.now().replace(day=1, hour=00, minute=00, second=00, microsecond=00)
+    default_to = datetime.now()
+
+    final_from = auxillary_functions.parse_date(date_string=date_from, default_date=default_from)
+    final_to = auxillary_functions.parse_date(date_string=date_to, default_date=default_to)
+
+    tara, transctions = find_transactions_by_id_and_time(id=id, start_time=final_from, end_time=final_to)
+    if transctions is None:
+        transctions = find_transactions_by_container(container_id=id, start_time=final_from, end_time=final_to)
+        container: Container = db.session.query(Container).filter(Container.container_id == id).first()
+        unit, tara = auxillary_functions.lb_to_kg(unit=container.unit, weight=container.weight)
+    
+    if transctions is None:
+        return f"ID {id} not found in requested time range.", 404
+    
+    session_ids = []
+    for transaction in transctions:
+        session_ids.append(transaction.session_id)
+    auxillary_functions.print_debug(f"len of sessions id list at first: {len(session_ids)}")
+    auxillary_functions.print_debug(f"session id list is: {session_ids}")
+    list(set(session_ids))
+    auxillary_functions.print_debug(f"after set, list len is {len(session_ids)}")
+    auxillary_functions.print_debug(f"after set, list is {session_ids}")
+    for _item in session_ids:
+        if _item is None:
+            session_ids.remove(_item)
+    auxillary_functions.print_debug(f"after None removal, list len is {len(session_ids)}")
+    auxillary_functions.print_debug(f"after None remova, list is {session_ids}")
+    
+    ret = {"id": id, "tara": tara if tara else 'na', 'sessions': session_ids, 'unit': 'kg'}
+    return ret
+
+
 
 @app.route("/")
 def index():
@@ -343,7 +428,6 @@ def get_containers():
         "count": len(containers_list),
         "containers": containers_list
     })
-
     
 @app.route("/unknown", methods=["GET"])  
 def get_unknown():
@@ -356,14 +440,12 @@ def get_unknown():
         # Iterates over all transactions
         if tx.containers:  
             # Checks if the transaction has any container IDs listed
-            for cid in tx.containers.split(","):  
-                # Splits the container string (assumed to be comma-separated IDs)
-                cid = cid.strip()  
-                # Removes any leading/trailing whitespace from the container ID
+            for cid in json.loads(tx.containers):  
                 if cid and not Container.query.get(cid):  
                     # Checks if the ID is non-empty AND does NOT exist in the Container table
                     ids.add(cid)  
                     # Adds the container ID to the set of unknown containers
+  
     return jsonify(list(ids))  
     # Converts the set of unknown IDs into a list and returns it as a JSON response
 
@@ -390,21 +472,6 @@ def get_transactions():
         "transactions": transactions_list
     })
 
-@app.route("/containers", methods=["GET"])
-def get_containers():
-    containers = Container.query.all()
-    containers_list = [
-        {
-            "container_id": c.container_id,
-            "weight": c.weight,
-            "unit": c.unit
-        }
-        for c in containers
-    ]
-    return jsonify({
-        "count": len(containers_list),
-        "containers": containers_list
-    })
 
 
 if __name__ == '__main__':

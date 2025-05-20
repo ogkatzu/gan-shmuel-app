@@ -1,6 +1,7 @@
 from datetime import datetime
-from sqlalchemy import text
+from sqlalchemy import text, or_, and_
 import sys
+   
 
 def print_debug(msg: str):
     print(msg, file=sys.stdout, flush=True)
