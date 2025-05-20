@@ -12,11 +12,12 @@ services:
     ports:
       - "5500:5500"
     volumes:
-      - ./billing/flask-in:/app
+      - billing-files:/app/in     # Input files directory for Excel uploads
     depends_on:
       - billdb
     networks:
       - backend
+    restart: unless-stopped
 
   billdb:
     image: mysql:5.7
@@ -26,8 +27,15 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
     volumes:
       - ./billing/billdb:/docker-entrypoint-initdb.d
+      - billing-data:/var/lib/mysql
     networks:
       - backend
+    restart: unless-stopped
+
+# Named volumes for persistence
+volumes:
+  billing-data:    # MySQL database files
+  billing-files:   # Input files for processing
 
 networks:
   backend:
