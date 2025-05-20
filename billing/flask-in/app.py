@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify, send_file
 import mysql.connector
 from mysql.connector import Error
 import pandas as pd
-# from flask_sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 import openpyxl
 
 app = Flask(__name__)
@@ -222,7 +222,7 @@ def load_rates():
 
         for _, row in df.iterrows():
             cursor.execute("""
-                INSERT INTO Rates (product_id, rate, scope) 
+                INSERT INTO Rates (product_id, rate, scope)
                 VALUES (%s, %s, %s)
             """, (row['Product'], int(row['Rate']), row['Scope']))
 
