@@ -6,7 +6,7 @@ import csv
 
 from classes_db import Container, Transaction, db
 import auxillary_functions
-
+from auxillary_functions import print_debug
 
 def register_routes(app):
    
@@ -67,9 +67,9 @@ def register_routes(app):
         added = 0 
         try:
             if filename.endswith('.csv'):
-                added = auxillary_functions.handle_csv_in_file(filename, added)
+                added = auxillary_functions.handle_csv_in_file(filepath, added)
             elif filename.endswith('.json'):
-                added = auxillary_functions.handle_json_in_file(filename, added)
+                added = auxillary_functions.handle_json_in_file(filepath, added)
             else:
                 return jsonify({'error': 'Unsupported file format'}), 400
             db.session.commit()
@@ -96,16 +96,22 @@ def register_routes(app):
     
     @app.route("/unknown", methods=["GET"])  
     def get_unknown():
-        unknown = Transaction.query.all()  
-        ids = set()  
-        for tx in unknown:  
-            if tx.containers:  
-                for cid in json.loads(tx.containers):  
+     unknown = Transaction.query.all()  
+     ids = set()  
+    
+     for tx in unknown:  
+        if tx.containers:  
+            try:
+                containers = json.loads(tx.containers)
+                for cid in containers:  
                     if cid and not Container.query.get(cid):  
-                        ids.add(cid)  
+                        ids.add(cid)
+            except json.JSONDecodeError:
+                print(f"Invalid JSON in tx.containers (tx id {tx.id}):", tx.containers)
+                continue
   
-        return jsonify(list(ids))  
-
+     return jsonify(list(ids))  
+    
     # only for show transactions db in html
     @app.route("/transactions", methods=["GET"])
     def get_transactions():
@@ -120,7 +126,9 @@ def register_routes(app):
                 "bruto": t.bruto,
                 "truckTara": t.truckTara,
                 "neto": t.neto,
-                "produce": t.produce
+                "produce": t.produce,
+                "session_id": t.session_id
+
             }
             for t in transactions
         ]
