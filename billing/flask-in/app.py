@@ -3,8 +3,10 @@ from flask import Flask, request, jsonify, send_file
 import mysql.connector
 from mysql.connector import Error
 import pandas as pd
-from flask_sqlalchemy import SQLAlchemy
+# from flask_sqlalchemy import SQLAlchemy
 import openpyxl
+import requests
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -298,6 +300,85 @@ def export_to_excel():
     except mysql.connector.Error as err:
         return jsonify({"error": str(err)}), 500
 
+
+@app.route('/bill/<int:provider_id>', methods=['GET'])
+def get_bill(provider_id):
+    """Endpoint to generate billing report for a specific provider within a time range.
+    - URL params: t1 (start datetime), t2 (end datetime) in format yyyymmddhhmmss
+    - t1 default: first day of current month at 00:00:00
+    - t2 default: current datetime"""
+
+    # set default time "t1==from" "t2==to"
+    def parse_time(ts_str, label):
+        try:
+            return datetime.strptime(ts_str, "%Y%m%d%H%M%S")
+        except ValueError:
+            raise ValueError(f"Invalid format for {label}. Expected yyyymmddhhmmss.")
+    try:
+        # Parse arguments
+        t1_str = request.args.get('t1')
+        t2_str = request.args.get('t2')
+        now = datetime.now()
+
+        # Default t1: first of current month at 00:00:00
+        if not t1_str:
+            t1 = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        else:
+            t1 = parse_time(t1_str, 't1')
+
+        # Default t2: current time
+        if not t2_str:
+            t2 = now
+        else:
+            t2 = parse_time(t2_str, 't2')
+
+        if t1 > t2:
+            return jsonify({"error": "t1 must be before t2"}), 400
+
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+
+    total_bill = 0
+
+    # DB query to count trucks for this provider
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM Trucks WHERE provider_id = %s", (provider_id,))
+    truck_ids = [row[0] for row in cursor.fetchall()]
+    truck_count = len(truck_ids)
+    # above line can be replace with:
+    # truck_count = cursor.fetchone()[0]
+    conn.close()
+
+    # Use mock API to count total sessions
+    session_count = 0
+    for truck_id in truck_ids:
+        try:
+            item_url = f"http://localhost:5500/mock/item/{truck_id}"
+            res = requests.get(item_url, timeout=5)
+
+            if res.status_code == 200:
+                data = res.json()
+                session_count += len(data.get("sessions", []))
+            elif res.status_code == 404:
+                continue  # skip if truck not found
+            else:
+                continue  # skip if other error
+        except requests.RequestException:
+            continue  # skip failed requests
+
+    return jsonify({
+            "provider_id": provider_id,
+            "from": t1.strftime("%Y-%m-%d %H:%M:%S"),
+            "to": t2.strftime("%Y-%m-%d %H:%M:%S"),
+            "truck_count": truck_count,
+            "sessionCount": session_count,
+
+            "message": "Time range parsed successfully",
+            "total": total_bill
+    }), 200
 
 
 if __name__ == "__main__":
