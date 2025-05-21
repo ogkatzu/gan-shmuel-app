@@ -299,7 +299,25 @@
           </div>
         </div>
         <button class="btn btn-info mb-3" onclick="fetchItem()">Fetch Item</button>
-        <pre id="itemResult">Enter item ID and click fetch</pre>
+<div id="itemResultWrapper">
+  <p id="itemMessage">Enter item ID and click fetch</p>
+  <table class="table table-bordered table-hover" id="itemResultTable" style="display: none;">
+    <thead class="table-dark">
+      <tr>
+        <th>ID</th>
+        <th>Tara</th>
+        <th>Sessions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td id="itemIdCell"></td>
+        <td id="itemTaraCell"></td>
+        <td id="itemSessionsCell"></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
       </div>
 
     </div>
