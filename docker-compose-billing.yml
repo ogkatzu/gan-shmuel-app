@@ -12,8 +12,7 @@ services:
     ports:
       - "5500:5500"
     volumes:
-      - billing-files:/app/in     # Input files directory for Excel uploads
-      - ./billing/flask-in/in/:/app/in  # Mount the "in" directory containing rates.xlsx
+      - ./billing/flask-in/in:/app/in  # Bind mount for the "in" directory
     depends_on:
       - billdb
     networks:
@@ -33,10 +32,9 @@ services:
       - backend
     restart: unless-stopped
 
-# Named volumes for persistence
+# Named volume for MySQL data persistence only
 volumes:
   billing-data:    # MySQL database files
-  billing-files:   # Input files for processing
 
 networks:
   backend:
