@@ -1,7 +1,14 @@
 import pytest
 from datetime import datetime
 from unittest.mock import MagicMock
-from weight.auxillary_functions import lb_to_kg, parse_date, get_transactions_by_time_range
+# from weight.auxillary_functions import lb_to_kg, parse_date, get_transactions_by_time_range
+import sys
+import os
+host = os.environ.get('TEST_HOST', 'localhost')
+BASE_URL = f"http://{host}:5000"
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from auxillary_functions import lb_to_kg, parse_date, get_transactions_by_time_range
+
 
 # Test that 2205 pounds is correctly converted to 1000 kilograms
 def test_lb_to_kg_conversion():

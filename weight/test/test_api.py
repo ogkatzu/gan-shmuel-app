@@ -1,8 +1,10 @@
 
 import pytest
 import requests
-
-BASE_URL = "http://localhost:5000"  # Adjust according to your environment
+import datetime
+import os
+host = os.environ.get('TEST_HOST', 'localhost')
+BASE_URL = f"http://{host}:5000"
 
 def test_health():
     response = requests.get(f"{BASE_URL}/health")
@@ -49,7 +51,7 @@ def test_get_unknown_containers():
 
 def test_post_batch_weight_csv():
     payload = {
-        "file": "containers1.csv"
+        "file": "containers2.csv"
     }
 
     headers = {
@@ -86,3 +88,48 @@ def test_get_session_by_id():
         data = response.json()
         assert "id" in data
         assert "bruto" in data
+
+def test_weight_post():
+    payload = {
+        "direction": "in",
+        "truck": "AB9123",
+        "containers": ["K-8263", "K-5269", "K-7943"],
+        "weight": 18000,
+        "unit": "kg",
+        "force": False,
+        "produce": "tomato",
+        "datetime": "2025-05-21T12:00:00"
+    }
+
+    response = requests.post(f"{BASE_URL}/weight", json=payload)
+
+    if response.status_code == 400:
+        pytest.skip("Truck already exists.")
+
+    assert response.status_code in [200, 201], f"Unexpected status: {response.status_code}"
+    data = response.json()
+    assert "truck" in data, "The response does not contain a truck ID"
+    assert "bruto" in data, "The response does not contain a bruto weight"
+
+def test_get_item():
+    # Test with existing truck ID
+    truck_id = "AB9123"  # Replace with a known ID
+    # Perform the request
+    response = requests.get(f"{BASE_URL}/item/{truck_id}")
+    # Check if item exists, otherwise skip
+    if response.status_code == 404:
+        pytest.skip(f"Item {truck_id} not found. Create it before running this test.")
+    # Basic assertions
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "id" in data
+    assert "tara" in data
+    assert "sessions" in data
+    # Test with a non-existent ID
+    nonexistent_id = "EEEEE123456"
+    response_nonexistent = requests.get(f"{BASE_URL}/item/{nonexistent_id}")
+    assert response_nonexistent.status_code == 404
+
+
+
