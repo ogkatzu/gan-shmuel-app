@@ -21,8 +21,12 @@ __pycache__/
 *.log
 *.pid
 *.tmp
+<<<<<<< HEAD
 *.orig
 *.rej
+=======
+in/
+>>>>>>> main
 
 # Secrets and certificates
 *.key

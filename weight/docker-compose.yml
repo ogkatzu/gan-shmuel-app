@@ -1,0 +1,36 @@
+# --- Implemented by Dalit Verner ---
+
+services:
+  weight_app:
+    build: .
+    ports:
+      - "5000:5000"
+    depends_on:
+      weight_db:
+       condition: service_healthy
+    volumes:
+      # - .:/app
+      - ./in:/app/in
+    env_file:
+      - .env
+
+  weight_db:
+    image: mysql:8
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ./weightdb.sql:/docker-entrypoint-initdb.d/weightdb.sql  # Mount the SQL file
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+volumes:
+  db_data:
