@@ -68,15 +68,16 @@ def register_routes(app):
         if not os.path.exists(filepath):
             return jsonify({'error': 'File not found'}), 400
         added = 0 
+        total_num_of_containers = 0
         try:
             if filename.endswith('.csv'):
-                added = auxillary_functions.handle_csv_in_file(filepath, added)
+                added, total_num_of_containers = auxillary_functions.handle_csv_in_file(filepath, added, total_num_of_containers)
             elif filename.endswith('.json'):
-                added = auxillary_functions.handle_json_in_file(filepath, added)
+                added, total_num_of_containers = auxillary_functions.handle_json_in_file(filepath, added, total_num_of_containers)
             else:
                 return jsonify({'error': 'Unsupported file format'}), 400
             db.session.commit()
-            return jsonify({'status': 'ok', 'added': added})
+            return jsonify({'status': 'ok', 'added': f"Added {added} out of {total_num_of_containers}."})
         except Exception as e:
             return jsonify({'error': 'An error occurred', 'details': str(e)}), 500
 

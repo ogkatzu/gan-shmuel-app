@@ -35,57 +35,59 @@ def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_tim
     new_transaction. truckTara = truck_tara
     return new_transaction
 
-def handle_json_in_file(filepath, added):
+def handle_json_in_file(filepath, added, total_num_of_containers):
     with open(filepath) as jsonfile:
-                    data = json.load(jsonfile)
-                    if not isinstance(data, list):
-                        return jsonify({'error': 'JSON format must be a list'}), 400
-                    for item in data:
-                        cid = item.get('id')
-                        weight = item.get('weight')
-                        unit = item.get('unit', '').lower()
-                        if not cid or weight is None or not unit:
-                            continue
-                        try:
-                            weight = float(weight)
-                        except ValueError:
-                            continue  # Skip invalid weights
-                        existing = Container.query.get(cid)
-                        if existing:
-                            existing.weight = weight
-                            existing.unit = unit
-                        else:
-                            new = Container(container_id=cid, weight=weight, unit=unit)
-                            db.session.add(new)
-                        added += 1
-    return added
+            data = json.load(jsonfile)
+            if not isinstance(data, list):
+                return jsonify({'error': 'JSON format must be a list'}), 400
+            for item in data:
+                cid = item.get('id')
+                weight = item.get('weight')
+                unit = item.get('unit', '').lower()
+                if not cid or weight is None or not unit:
+                    continue
+                try:
+                    weight = float(weight)
+                except ValueError:
+                    total_num_of_containers += 1
+                    continue  # Skip invalid weights
+                existing = Container.query.get(cid)
+                if existing:
+                    existing.weight = weight
+                    existing.unit = unit
+                else:
+                    new = Container(container_id=cid, weight=weight, unit=unit)
+                    db.session.add(new)
+                added += 1
+    return added, total_num_of_containers
 
-def handle_csv_in_file(filepath, added):
+def handle_csv_in_file(filepath, added, total_num_of_containers):
     with open(filepath, newline='') as csvfile:
-                    reader = csv.reader(csvfile)
-                    headers = next(reader, None)  
-                    if not headers or len(headers) < 2:
-                        return jsonify({'error': 'Invalid CSV headers'}), 400
-                    unit = headers[1].lower()  
-                    for row in reader:
-                        if len(row) < 2:
-                            continue  # Skip malformed rows
-                        cid = row[0].strip()
-                        try:
-                            weight = float(row[1])
-                        except ValueError:
-                            continue  # Skip rows with invalid weight
-                        if not cid:
-                            continue  # Skip empty container ID
-                        existing = Container.query.get(cid)
-                        if existing:
-                            existing.weight = weight
-                            existing.unit = unit
-                        else:
-                            new = Container(container_id=cid, weight=weight, unit=unit)
-                            db.session.add(new)
-                        added += 1
-    return added
+            reader = csv.reader(csvfile)
+            headers = next(reader, None)  
+            if not headers or len(headers) < 2:
+                return jsonify({'error': 'Invalid CSV headers'}), 400
+            unit = headers[1].lower()  
+            for row in reader:
+                if len(row) < 2:
+                    continue  # Skip malformed rows
+                cid = row[0].strip()
+                try:
+                    weight = float(row[1])
+                except ValueError:
+                    total_num_of_containers += 1
+                    continue  # Skip rows with invalid weight
+                if not cid:
+                    continue  # Skip empty container ID
+                existing = Container.query.get(cid)
+                if existing:
+                    existing.weight = weight
+                    existing.unit = unit
+                else:
+                    new = Container(container_id=cid, weight=weight, unit=unit)
+                    db.session.add(new)
+                added += 1
+    return added, total_num_of_containers
 
 def get_item_data(date_from, date_to, id):
     default_from = datetime.now().replace(day=1, hour=00, minute=00, second=00, microsecond=00)
