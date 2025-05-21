@@ -18,6 +18,22 @@ XL_DB_OUT = os.path.join(os.getcwd(), 'temp_rates.xlsx')
 # APP_IN_NETWORK = "flask/in/"  # will use for network between docker
 # APP_OUT_NETWORK = "flask/out/"
 
+# ########## helper methods ########### #
+@app.route('/get_truck', methods=['GET'])
+def get_truck():
+    """BONUS (we didnt required to) - historical of all tracks"""
+    product = request.args.get('Product')
+    rate = request.args.get('Rate')
+    scope = request.args.get('Scope')
+
+    return jsonify({
+        'Product': product,
+        'Rate': rate,
+        'Scope': scope,
+        'message': 'GET request received'
+    })
+# #########f helper methods ########### #
+
 
 def get_db_connection():
     """ "connector" to mysql DB"""
@@ -41,7 +57,10 @@ def health():
 
 @app.route("/provider", methods=["POST"])
 def create_provider():
-    """Admin registers a new provider. System validates uniqueness and stores in billdb."""
+    """Admin registers a new provider. System validates uniqueness and stores in billdb.
+    usage: curl -X POST http://127.0.0.1:5500/provider \
+            -H "Content-Type: application/json" \
+            -d '{"name": "MyProvider"}' """
     try:
         data = request.get_json()
         name = data.get("name")
@@ -87,25 +106,79 @@ def update_provider(provider_id):
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/post_truck', methods=['POST'])
-def post_truck():
+@app.route("/truck", methods=["POST"])
+def register_truck():
     """Admin links a truck to a provider ID in the system."""
-    data = request.get_json()
+    try:
+        data = request.json
+        truck_id = data.get("id")
+        provider_id = data.get("provider")
 
-    if not data:
-        return jsonify({'error': 'Missing or invalid JSON'}), 400
+        # Check for required fields in request
+        if not truck_id or not provider_id:
+            return jsonify({"error": "Missing 'id' or 'provider' field"}), 400
 
-    if not isinstance(data, list):
-        return jsonify({'error': 'Expected a list of truck items'}), 400
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    for entry in data:
-        if not all(k in entry for k in ['Product', 'Rate', 'Scope']):
-            return jsonify({'error': f'Missing keys in entry: {entry}'}), 400
+        # Check if provider exists
+        cursor.execute("SELECT 1 FROM Provider WHERE id = %s", (provider_id,))
+        if cursor.fetchone() is None:
+            conn.close()
+            return jsonify({"error": f"Provider ID {provider_id} does not exist"}), 404
 
-    return jsonify({
-        'message': 'Truck data received successfully',
-        'entries_received': len(data)
-    }), 200
+        # Check if truck ID already exists
+        cursor.execute("SELECT 1 FROM Trucks WHERE id = %s", (truck_id,))
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({"error": f"Truck with ID {truck_id} already exists"}), 409
+
+        # Insert new truck
+        cursor.execute("INSERT INTO Trucks (id, provider_id) VALUES (%s, %s)", (truck_id, provider_id))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"status": "registered"}), 201
+
+    except Error as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/truck/<id>", methods=["PUT"])
+def update_truck_provider(id):
+    """Admin updates provider linkage for a truck already in the system."""
+    try:
+        data = request.json
+        new_provider_id = data.get("provider")
+
+        # validation
+        if not new_provider_id:
+            return jsonify({"error": "Missing 'provider' field"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # check truck exists
+        cursor.execute("SELECT 1 FROM Trucks WHERE id = %s", (id,))
+        if cursor.fetchone() is None:
+            conn.close()
+            return jsonify({"error": f"Truck ID {id} does not exist"}), 404
+
+        # check new provider exists
+        cursor.execute("SELECT 1 FROM Provider WHERE id = %s", (new_provider_id,))
+        if cursor.fetchone() is None:
+            conn.close()
+            return jsonify({"error": f"Provider ID {new_provider_id} does not exist"}), 404
+
+        # update provider_id
+        cursor.execute("UPDATE Trucks SET provider_id = %s WHERE id = %s", (new_provider_id, id))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"status": "provider updated"}), 200
+
+    except Error as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/truck/<truck_id>", methods=["GET"])
@@ -152,116 +225,6 @@ def mock_session(session_id):
         "neto": 600
     })
 # ###########f mock testing helpers ############## #
-
-
-@app.route('/get_truck', methods=['GET'])
-def get_truck():
-    """BONUS (we didnt required to) - historical of all tracks"""
-    product = request.args.get('Product')
-    rate = request.args.get('Rate')
-    scope = request.args.get('Scope')
-
-    return jsonify({
-        'Product': product,
-        'Rate': rate,
-        'Scope': scope,
-        'message': 'GET request received'
-    })
-
-
-@app.route('/get_truck/<truck_id>', methods=['GET'])
-def get_truck_id(truck_id):
-    """Used by producer to query historical data for a truck."""
-    # You can still get optional query params if needed
-    product = request.args.get('Product')
-    rate = request.args.get('Rate')
-    scope = request.args.get('Scope')
-
-    return jsonify({
-        'TruckID': truck_id,
-        'Product': product,
-        'Rate': rate,
-        'Scope': scope,
-        'message': f'GET request received for truck {truck_id}'
-    })
-
-
-@app.route("/truck", methods=["POST"])
-def register_truck():
-    """2nd implemantation for that function (we have it implemented above)"""
-    try:
-        data = request.json
-        truck_id = data.get("id")
-        provider_id = data.get("provider")
-
-        # Check for required fields in request
-        if not truck_id or not provider_id:
-            return jsonify({"error": "Missing 'id' or 'provider' field"}), 400
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Check if provider exists
-        cursor.execute("SELECT 1 FROM Provider WHERE id = %s", (provider_id,))
-        if cursor.fetchone() is None:
-            conn.close()
-            return jsonify({"error": f"Provider ID {provider_id} does not exist"}), 404
-
-        # Check if truck ID already exists
-        cursor.execute("SELECT 1 FROM Trucks WHERE id = %s", (truck_id,))
-        if cursor.fetchone():
-            conn.close()
-            return jsonify({"error": f"Truck with ID {truck_id} already exists"}), 409
-
-        # Insert new truck
-        cursor.execute("INSERT INTO Trucks (id, provider_id) VALUES (%s, %s)", (truck_id, provider_id))
-        conn.commit()
-        conn.close()
-
-        return jsonify({"status": "registered"}), 201
-
-    except Error as e:
-        return jsonify({"error": str(e)}), 500
-
-    except Error as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/truck/<id>", methods=["PUT"])
-def update_truck_provider(id):
-    """Admin updates provider linkage for a truck already in the system."""
-    try:
-        data = request.json
-        new_provider_id = data.get("provider")
-
-        # validation
-        if not new_provider_id:
-            return jsonify({"error": "Missing 'provider' field"}), 400
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # check truck exists
-        cursor.execute("SELECT 1 FROM Trucks WHERE id = %s", (id,))
-        if cursor.fetchone() is None:
-            conn.close()
-            return jsonify({"error": f"Truck ID {id} does not exist"}), 404
-
-        # check new provider exists
-        cursor.execute("SELECT 1 FROM Provider WHERE id = %s", (new_provider_id,))
-        if cursor.fetchone() is None:
-            conn.close()
-            return jsonify({"error": f"Provider ID {new_provider_id} does not exist"}), 404
-
-        # update provider_id
-        cursor.execute("UPDATE Trucks SET provider_id = %s WHERE id = %s", (new_provider_id, id))
-        conn.commit()
-        conn.close()
-
-        return jsonify({"status": "provider updated"}), 200
-
-    except Error as e:
-        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/post_rates', methods=['POST'])
