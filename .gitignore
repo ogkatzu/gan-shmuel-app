@@ -23,6 +23,7 @@ __pycache__/
 *.tmp
 *.orig
 *.rej
+in/
 
 # Secrets and certificates
 *.key
