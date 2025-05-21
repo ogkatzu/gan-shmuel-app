@@ -1,22 +1,23 @@
 services:
   weight_app:
     privileged: true
-    build: .
+    build: ../../prod_env/main/weight/
     networks:
       - weight-network
     ports:
-      - "8082:5001"
+      - "8082:5000"
     depends_on:
       weight_db1:
         condition: service_healthy
     environment:
+      TEST_HOST: ci-weight_app-1
       MYSQL_DATABASE: weightdb
       MYSQL_ROOT_PASSWORD: rootpass
       MYSQL_USER: wightuser
       MYSQL_PASSWORD: weightpass
       MYSQL_HOST: weight_db1
     volumes:
-      - ./in:/app/in
+      - ../../prod/main/weight/in:/app/in
   
   weight_db1:
     image: mysql:8
@@ -25,6 +26,7 @@ services:
     networks:
       - weight-network
     environment:
+      TEST_HOST: ci-weight_app-
       MYSQL_DATABASE: weightdb
       MYSQL_ROOT_PASSWORD: rootpass
       MYSQL_USER: wightuser
@@ -33,10 +35,10 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - ./weightdb.sql:/docker-entrypoint-initdb.d/weightdb.sql
-      - db_data:/var/lib/mysql
+      - ../../prod_env/main/weight/weightdb.sql:/docker-entrypoint-initdb.d/weightdb.sql
+      - ../../prod_env/main/weight/db_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-prootpass"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,7 +53,7 @@ volumes:
 #     container_name: billing-app
 #     working_dir: /app
 #     volumes:
-#       - ./billing/flask-in:/app
+#       - ../prod_env/billing/flask-in:/app
 #     command: /bin/sh -c "pip install --no-cache-dir -r requirements.txt && flask run --host=0.0.0.0 --port=5000"
 #     environment:
 #       - FLASK_APP=app.py
@@ -61,7 +63,7 @@ volumes:
 #       - MYSQL_PASSWORD=root
 #       - MYSQL_DATABASE=billdb
 #     ports:
-#       - "8083:5001"
+#       - "8083:5500"
 #     depends_on:
 #       - billdb
 #     networks:
@@ -74,9 +76,9 @@ volumes:
 #       MYSQL_ROOT_PASSWORD: root
 #       MYSQL_DATABASE: billdb
 #     ports:
-#       -8084:3306
+#       -3307:3306
 #     volumes:
-#       - ./billing/billdb:/docker-entrypoint-initdb.d
+#       - ../../prod_env/billing/billdb:/docker-entrypoint-initdb.d
 #     networks:
 #       - mynet
 

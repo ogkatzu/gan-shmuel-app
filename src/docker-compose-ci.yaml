@@ -7,7 +7,7 @@ services:
       - weight-network
     ports:
       - "8080:8080"
-    working_dir: /app
+    working_dir: /ci
     logging:
       driver: "json-file"
       options:
@@ -15,7 +15,9 @@ services:
         max-file: "3"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - .:/app
+      - ./:/ci                        # CI runner logic
+      - ../../test_env:/test_env  # Test repo
+      - ../../prod_env:/prod_env  # Production repo
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
     env_file:
@@ -28,7 +30,6 @@ services:
       pip install -r requirements.txt &&
       echo 'Setup complete. Container is idle.' &&
       python3 webhook.py"
-#python3 webhook.py"
 networks:
   weight-network:
     external: true

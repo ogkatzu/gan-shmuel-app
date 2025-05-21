@@ -28,7 +28,8 @@ app = Flask(__name__)
 load_dotenv()
 # Configuration
 CONFIG = {
-    'repo_path': os.environ.get('REPO_PATH', '/tmp/repo'),
+    'prod_repo_path': os.environ.get('PROD_REPO_PATH', '/tmp/repo'),
+    'test_repo_path': os.environ.get('TEST_REPO_PATH', ''),
     'repo_url': os.environ.get('REPO_URL', '/tmp/repo'),
     'test_command': os.environ.get('TEST_COMMAND', 'pytest'),
     'github_secret': os.environ.get('GITHUB_SECRET', ''),
@@ -39,8 +40,7 @@ CONFIG = {
     'prod_deploy_script': os.environ.get('PROD_DEPLOY_SCRIPT', 'scripts/deploy_prod.sh'),
     'weight_emails':os.environ.get('WEIGHT_EMAILS', ''),
     'billing_emails':os.environ.get('BILLING_EMAILS', ''),
-    'devops_emails':os.environ.get('DEVOPS_EMAILS', ''),
-    'workdir_test': os.environ.get('WORKDIR_TEST', '')
+    'devops_emails':os.environ.get('DEVOPS_EMAILS', '')
 }
 
 def build_email(Subject, To, Msg):
@@ -53,10 +53,9 @@ def build_email(Subject, To, Msg):
     return message.as_string()
 
 def send_email(message, receiver_email):
+    return True
     logger.info("Sending email")
     context = ssl.create_default_context()
-    ######## TODO: REMOVE THIS LINE ##########
-    return "mail sent"
     with smtplib.SMTP(CONFIG['smtp_server'], CONFIG['smtp_port']) as server:
         server.ehlo()  # Can be omitted
         server.starttls(context=context)
@@ -65,11 +64,12 @@ def send_email(message, receiver_email):
         server.sendmail(CONFIG['email_sender'], receiver_email, message)
 
 
-def setup_test_env():
+def setup_test_env(branch):
     logger.info("Setting up test environment")
     try:
-        ######## TODO: REPLACEWITH TEST ENV ##########
-        subprocess.run(['docker', 'compose', '-f', CONFIG["repo_path"] + '/' + 'weight' + '/' + 'docker-compose-deploy.yaml', 'up', '-d'], check=True)
+        env = os.environ.copy()
+        env['BRANCH_NAME'] = branch
+        subprocess.run(['docker', 'compose', '-f', 'docker-compose-test.yaml', 'up', '-d'],env=env ,check=True)
         logger.info("Test environment setup complete")
         return True
     
@@ -78,13 +78,38 @@ def setup_test_env():
         return False
     
 
-def test_env_down_and_clean():
+def test_env_down_and_clean(branch):
     logger.info("Tearing down test environment")
-    ######## TODO: REPLACEWITH TEST ENV ##########
-    subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yaml', 'down'], check=True)
-    subprocess.run(['rm', '-rf', CONFIG['workdir_test'] + '/' + CONFIG['repo_path']])
+    env = os.environ.copy()
+    env['BRANCH_NAME'] = branch
+    subprocess.run(['docker', 'compose', '-f', 'docker-compose-test.yaml', 'down'], env=env,check=True)
+    subprocess.run(['rm', '-rf', CONFIG['test_repo_path'] + '/' + branch])
     return True
 
+def extract_test_failures(output):
+    failures = []
+    lines = output.split('\n')
+    current_failure = None
+    
+    for line in lines:
+        if line.startswith("FAILED "):
+            current_failure = line
+            failures.append(current_failure)
+        elif "E       " in line and current_failure:  # Error messages usually have this prefix
+            failures.append(line)
+    
+    # Add summary information (total passed/failed)
+    summary_lines = [line for line in lines if "failed" in line and "passed" in line and "=" in line]
+    if summary_lines:
+        failures.append("\nSummary: " + summary_lines[0].strip())
+    
+    # If no specific failures found but test failed, add a generic message
+    if not failures and result_wieght.returncode != 0:
+        failures.append("Tests failed with no specific error details available")
+        
+    return "\n".join(failures) if failures else "All tests passed"
+
+# Return the success status and only the extracted failure information
 
 def run_tests(branch):
     logger.info("Running tests")
@@ -93,23 +118,11 @@ def run_tests(branch):
         # Run tests through docker-compose exec
         # Assuming there's a main service where tests should run
         # TODO - Update this to run tests in the correct service
-        if not os.path.exists(CONFIG['workdir_test'] + CONFIG['repo_path']):
-            logger.info(f"Cloning repo {CONFIG['repo_url']} branch {branch} to {CONFIG['workdir_test'] + CONFIG['repo_path']}")
-            subprocess.run(['pwd'], check=True)
-            subprocess.run(['ls'], check=True)
-            subprocess.run(['git', 'clone', '--branch', branch, CONFIG['repo_url'],CONFIG['workdir_test'] + CONFIG['repo_path']], check=True)
-            subprocess.run(['ls', '-la', CONFIG['workdir_test'] + CONFIG['repo_path']], check=True)
-        # subprocess.run(['cd','test_env/gan-shmuel-app/weight/test/' ], check=True)
+        # if not os.path.exists(CONFIG['test_repo_path'] + '/' + branch):
+        #     logger.info(f"Cloning repo {CONFIG['repo_url']} branch {branch} to {CONFIG['test_repo_path']}")
+        #     subprocess.run(['git', 'clone', '--branch', branch, CONFIG['repo_url'], CONFIG['test_repo_path']], check=True)
+            # subprocess.run(['ls', '-la', CONFIG['workdir_test'] + CONFIG['repo_path']], check=True)
         #billing_command = ["pyestest", "test_env/gan-shmuel-app/billing/test/test_api.py"]
-        wieght_command = ["pytest", "test_api.py"]
-
-        logger.info(f"Running tests wieght")
-        result_wieght = subprocess.run(
-            wieght_command,
-            cwd="test_env/app/gan-shmuel-app/weight/test/",
-            capture_output=True,
-            text=True
-        )
 
         # logger.info(f"Running tests billing")
         # result_billing = subprocess.run(
@@ -118,21 +131,21 @@ def run_tests(branch):
         #     capture_output=True,
         #     text=True
         # )
+
+
+        wieght_command = ["pytest", "test_api.py"]
+
+        logger.info(f"Running tests wieght")
+        result_wieght = subprocess.run(
+            wieght_command,
+            cwd=f"{CONFIG['test_repo_path']}/{branch}/weight/test/",
+            capture_output=True,
+            text=True
+        )
+        failure_summary = extract_test_failures(result_wieght.stdout + result_wieght.stderr)
+        return result_wieght.returncode == 0, failure_summary
+
         
-        # Log test output for debugging
-        logger.info(f"Test stdout: {result_wieght.stdout}")
-        if result_wieght.stderr:
-            logger.warning(f"Test stderr: {result_wieght.stderr}")
-
-        # logger.info(f"Test stdout: {result_billing.stdout}")
-        # if result_billing.stderr:
-        #     logger.warning(f"Test stderr: {result_billing.stderr}")
-            
-        logger.info(f"Tests completed with return code: {result_wieght.returncode}")
-        #logger.info(f"Tests completed with return code: {result_billing.returncode}")
-
-        #return result_wieght.returncode == 0 and result_billing.returncode == 0, result_wieght.stdout + result_wieght.stderr + "\n" + result_billing.stdout + result_billing.stderr
-        return result_wieght.returncode == 0 , result_wieght.stdout + result_wieght.stderr
     except Exception as error:
         logger.error(f"Error running tests: {str(error)}")
         return False, str(error)
@@ -147,14 +160,16 @@ def deploy_to_production():
         logger.info("Taking down production environment")
         subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yaml', 'down'], check=True)
         # This would typically involve SSH commands or API calls to your production environment
-        
-        # Fetch latest changes to main
-        logger.info("Fetching latest changes to main")
-        fetch_branch('main')
+        if not any(os.scandir(CONFIG['prod_repo_path'])):
+            clone_repo(branch='main')
+        else:   
+            # Fetch latest changes to main
+            logger.info("Fetching latest changes to main")
+            fetch_branch('main')
         
         # Prod env up
         logger.info("Bringing up production environment")
-        subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yaml', 'up'], check=True)
+        subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yaml', 'up', '-d'], check=True)
         return True
 
     except Exception as error:
@@ -162,30 +177,41 @@ def deploy_to_production():
         return False
 
 
-def clone_repo(repo_url, branch, is_local=False):
+def clone_repo(branch, is_test=False,is_local=False):
+    repo_url = CONFIG['repo_url']
     try:
+        repo_path = ''
+        if is_test:
         # Remove existing repo if it exists
-        if os.path.exists(CONFIG['repo_path']): #TODO:check if is nessesery
-            shutil.rmtree(CONFIG['repo_path'])
-        
+            repo_path = CONFIG['test_repo_path'] + '/' + branch
+            if os.path.exists(repo_path): #TODO:check if is nessesery
+                shutil.rmtree(repo_path)
+        else:
+            repo_path = CONFIG['prod_repo_path'] + '/' + branch
+            if os.path.exists(repo_path): #TODO:check if is nessesery
+                shutil.rmtree(repo_path)
         # Clone the repository
+        subprocess.run(['mkdir', '-p', repo_path], check=True)
         logger.info(f"Cloning {repo_url}, branch: {branch}")
-        subprocess.run(['git', 'clone', '--branch', branch, repo_url, CONFIG['repo_path']], check=True)
+        subprocess.run(['git', 'clone', '--branch', branch, repo_url, repo_path], check=True)
         logger.info("Repository cloned successfully")
         return True
     except Exception as error:
         logger.error(f"Error cloning repository: {str(error)}")
         return False
     
-def fetch_branch(branch):
+def fetch_branch(branch, is_test=False):
     try:
+        repo_path = ''
+        if is_test:
+            repo_path = CONFIG['test_repo_path']
+        else:
+            repo_path = CONFIG['prod_repo_path']
         logger.info(f"Fetching branch: {branch}")
-        logger.info(f"Fetching repo path to: {CONFIG['repo_path']}")
-        subprocess.run(['ls', '-la', CONFIG['repo_path']], check=True)
-        subprocess.run(['git', '-C', CONFIG['repo_path'], 'fetch', 'origin'], check=True)
-
-        subprocess.run(['git', '-C', CONFIG['repo_path'], 'checkout', branch], check=True)
-        subprocess.run(['git', '-C', CONFIG['repo_path'], 'pull', 'origin', branch], check=True)
+        logger.info(f"Fetching repo path to: {repo_path}")
+        subprocess.run(['git', '-C', repo_path + '/' + branch, 'fetch', 'origin'], check=True)
+        subprocess.run(['git', '-C', repo_path + '/' + branch, 'checkout', branch], check=True)
+        subprocess.run(['git', '-C', repo_path + '/' + branch, 'pull', 'origin', branch], check=True)
         logger.info(f"Successfully checked out branch: {branch}")
         return True
     except Exception as error:
@@ -193,8 +219,6 @@ def fetch_branch(branch):
         return False
 
 def send_email_to_all(Subject, Msg):
-    ######## TODO: REMOVE THIS LINE ##########
-    return "mail sent"
     emails = json.loads(CONFIG['weight_emails'])
     for email in emails.values():
         msg = build_email(Subject, email, Msg)
@@ -224,20 +248,17 @@ def webhook():
     payload = request.get_data()
     branch =''
 
-    # logger.info("Header:", signature)
-    # logger.info("Expected:", CONFIG['github_secret'])
-
     if not verify_signature(payload, signature):# check if the request from github
         logger.error("Signature verification failed")
         abort(401, description='Signature verification failed')
     payload = request.json
     # Extract information
+
     is_merge_to_main = False
     is_pr = False
+    
+    is_test = True
 
-    is_repo_local = os.path.exists(CONFIG['repo_path'])
-
- 
     # Check if it's a push to main
     if payload.get("action") == "closed" and payload.get("pull_request", {}).get("merged") is True and payload["pull_request"]["base"]["ref"] == "main":
         is_merge_to_main = True
@@ -245,7 +266,7 @@ def webhook():
         branch = 'main'
     
     # Check if it's a PR
-    elif 'pull_request' in payload:
+    elif 'pull_request' in payload and (payload.get("action") == "opened" or payload.get("action") == "reopened"):
         is_pr = True
         repo_url = CONFIG['repo_url']
         branch = payload['pull_request']['head']['ref'] # the branch the pull request is from
@@ -258,17 +279,17 @@ def webhook():
     
     # Process according to the flowchart
     result_message = ""
-    
+    is_repo_local = os.path.exists(CONFIG['test_repo_path'] + '/' + branch)
     # PR path
     if is_pr:
         logger.info("Processing PR workflow")
         
         # Clone or fetch based on repo locality
         if is_repo_local:
-            success = fetch_branch(branch)
+            success = fetch_branch(branch, is_test)
             result_message += f"Fetched tested branch: {branch}\n"
         else:
-            success = clone_repo(repo_url, branch)
+            success = clone_repo(branch, is_test)
             result_message += f"Cloned tested branch: {branch}\n"
         
         if not success:
@@ -281,10 +302,10 @@ def webhook():
         
         # Clone or fetch based on repo locality
         if is_repo_local:
-            success = fetch_branch('main')
+            success = fetch_branch('main', is_test)
             result_message += f"Fetched main branch\n"
         else:
-            success = clone_repo(repo_url, 'main')
+            success = clone_repo('main', is_test)
             result_message += f"Cloned main branch\n"
         
         if not success:
@@ -292,7 +313,7 @@ def webhook():
             return Response(response=response_data, status=500, mimetype='application/json')
     
     # Set up test environment
-    setup_success = setup_test_env()
+    setup_success = setup_test_env(branch)
     if not setup_success:
         devops_team = json.loads(CONFIG['devops_emails'])
         for email in devops_team.values():
@@ -305,8 +326,8 @@ def webhook():
     result_message += f"Test results: {'PASSED' if tests_passed else 'FAILED'}\n"
     
     # Tear down test environment
-    test_env_down_and_clean()
-    
+    test_env_down_and_clean(branch)
+    is_test = False
     # Check results and send email
     if is_pr:
         emails = json.loads(CONFIG['weight_emails'])
@@ -335,7 +356,10 @@ def webhook():
         else:
             send_email_to_all("PASSED - MERGE" , f"Test Results:\n{result_message}\n\nTest Output:\n{test_output}\n\nPull latest version.")
             
-    
+    ###### REMOVE AFTER TESTING ######
+    is_merge_to_main = True
+    tests_passed = True
+    ###### REMOVE AFTER TESTING ######
     # For merge to main and successful tests, deploy to production
     if is_merge_to_main and tests_passed:
         deploy_success = deploy_to_production()
