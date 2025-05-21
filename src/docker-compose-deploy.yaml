@@ -6,6 +6,7 @@ services:
       - weight-network
     ports:
       - "8082:5000"
+    restart: on-failure
     depends_on:
       weight_db1:
         condition: service_healthy
@@ -17,7 +18,7 @@ services:
       MYSQL_PASSWORD: weightpass
       MYSQL_HOST: weight_db1
     volumes:
-      - ../../prod/main/weight/in:/app/in
+      - ${WEIGHT_PATH_IN}:/app/in
   
   weight_db1:
     image: mysql:8
@@ -42,6 +43,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
 
 volumes:
   db_data:

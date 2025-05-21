@@ -10,12 +10,12 @@ services:
       weight_db1_test:
         condition: service_healthy
     environment:
-      TEST_HOST: ci-weight_app-1
+      TEST_HOST: ci-weight_app_test-1
       MYSQL_DATABASE: weightdb
       MYSQL_ROOT_PASSWORD: rootpass
       MYSQL_USER: wightuser
       MYSQL_PASSWORD: weightpass
-      MYSQL_HOST: weight_db1
+      MYSQL_HOST: weight_db1_test  # <-- Changed from weight_db1 to weight_db1_test
     volumes:
       - ../test_env/${BRANCH_NAME}/weight/in:/app/in
   
@@ -30,7 +30,6 @@ services:
       MYSQL_ROOT_PASSWORD: rootpass
       MYSQL_USER: wightuser
       MYSQL_PASSWORD: weightpass
-      MYSQL_HOST: weight_db1
     ports:
       - "3308:3306"
     volumes:
@@ -41,9 +40,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
 
 volumes:
   db_data:
+
 
 
 

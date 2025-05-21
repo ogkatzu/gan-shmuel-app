@@ -7,6 +7,7 @@ import json
 import smtplib, ssl
 import logging
 import shutil
+from time import sleep
 from dotenv import load_dotenv
 from email.mime.text import MIMEText
 
@@ -69,7 +70,9 @@ def setup_test_env(branch):
     try:
         env = os.environ.copy()
         env['BRANCH_NAME'] = branch
-        subprocess.run(['docker', 'compose', '-f', 'docker-compose-test.yaml', 'up', '-d'],env=env ,check=True)
+        subprocess.run(['docker', 'compose', '-f', 'docker-compose-test.yaml', 'up','--build' ,'-d'],env=env ,check=True)
+        # Wait for the containers to be healthy
+
         logger.info("Test environment setup complete")
         return True
     
@@ -82,7 +85,7 @@ def test_env_down_and_clean(branch):
     logger.info("Tearing down test environment")
     env = os.environ.copy()
     env['BRANCH_NAME'] = branch
-    subprocess.run(['docker', 'compose', '-f', 'docker-compose-test.yaml', 'down'], env=env,check=True)
+    subprocess.run(['docker', 'compose', '-f', 'docker-compose-test.yaml', 'down','--volumes'], env=env,check=True)
     subprocess.run(['rm', '-rf', CONFIG['test_repo_path'] + '/' + branch])
     return True
 
@@ -104,8 +107,8 @@ def extract_test_failures(output):
         failures.append("\nSummary: " + summary_lines[0].strip())
     
     # If no specific failures found but test failed, add a generic message
-    if not failures and result_wieght.returncode != 0:
-        failures.append("Tests failed with no specific error details available")
+    # if not failures and result_wieght.returncode != 0:
+        # failures.append("Tests failed with no specific error details available")
         
     return "\n".join(failures) if failures else "All tests passed"
 
@@ -136,12 +139,14 @@ def run_tests(branch):
         wieght_command = ["pytest", "test_api.py"]
 
         logger.info(f"Running tests wieght")
+        sleep(10)
         result_wieght = subprocess.run(
             wieght_command,
             cwd=f"{CONFIG['test_repo_path']}/{branch}/weight/test/",
             capture_output=True,
             text=True
         )
+        # logger.info(result_wieght.stdout + result_wieght.stderr)
         failure_summary = extract_test_failures(result_wieght.stdout + result_wieght.stderr)
         return result_wieght.returncode == 0, failure_summary
 
@@ -149,8 +154,6 @@ def run_tests(branch):
     except Exception as error:
         logger.error(f"Error running tests: {str(error)}")
         return False, str(error)
-
-
 
 
 def deploy_to_production():
@@ -169,7 +172,7 @@ def deploy_to_production():
         
         # Prod env up
         logger.info("Bringing up production environment")
-        subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yaml', 'up', '-d'], check=True)
+        subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yaml', 'up','--build', '-d'], check=True)
         return True
 
     except Exception as error:
@@ -209,9 +212,8 @@ def fetch_branch(branch, is_test=False):
             repo_path = CONFIG['prod_repo_path']
         logger.info(f"Fetching branch: {branch}")
         logger.info(f"Fetching repo path to: {repo_path}")
-        subprocess.run(['git', '-C', repo_path + '/' + branch, 'fetch', 'origin'], check=True)
-        subprocess.run(['git', '-C', repo_path + '/' + branch, 'checkout', branch], check=True)
         subprocess.run(['git', '-C', repo_path + '/' + branch, 'pull', 'origin', branch], check=True)
+        subprocess.run(['git', '-C', repo_path + '/' + branch, 'checkout', branch], check=True)
         logger.info(f"Successfully checked out branch: {branch}")
         return True
     except Exception as error:
@@ -324,7 +326,7 @@ def webhook():
     # Run tests
     tests_passed, test_output = run_tests(branch)
     result_message += f"Test results: {'PASSED' if tests_passed else 'FAILED'}\n"
-    
+    logger.info(test_output)
     # Tear down test environment
     test_env_down_and_clean(branch)
     is_test = False
@@ -356,10 +358,6 @@ def webhook():
         else:
             send_email_to_all("PASSED - MERGE" , f"Test Results:\n{result_message}\n\nTest Output:\n{test_output}\n\nPull latest version.")
             
-    ###### REMOVE AFTER TESTING ######
-    is_merge_to_main = True
-    tests_passed = True
-    ###### REMOVE AFTER TESTING ######
     # For merge to main and successful tests, deploy to production
     if is_merge_to_main and tests_passed:
         deploy_success = deploy_to_production()
@@ -381,6 +379,107 @@ def health():
     response_data = json.dumps({'status': 'healthy'})
     return Response(response=response_data, status=200, mimetype='application/json')
 
+@app.route('/rollback', methods=['GET'])
+def rollback_form():
+    branch = request.args.get('branch', 'main')
+
+    if branch != 'main':
+        return Response("Rollback is allowed only on the 'main' branch", status=403)
+
+    repo_path = os.path.join(CONFIG['prod_repo_path'], branch)
+
+    if not os.path.exists(repo_path):
+        success = clone_repo(branch=branch)
+        if not success:
+            return Response("Failed to clone the repository", status=500)
+
+    try:
+        # Get the last 50 merge commits with their GPG status
+        output = subprocess.check_output(
+            ['git', '-C', repo_path, 'log', '--merges',
+             '--pretty=format:%h - %s - %an - %cr|%G?', '-n', '50'],
+            text=True
+        )
+
+        lines = output.strip().split('\n')
+
+        # Keep only lines where GPG status is "G" (verified)
+        verified_commits = [line.split('|')[0] for line in lines if line.endswith('|G')]
+
+        if not verified_commits:
+            return Response("No verified merge commits found on 'main'", status=404)
+
+        # Create <option> list from verified commits
+        commit_options = ''.join(
+            f'<option value="{line.split()[0]}">{line}</option>' for line in verified_commits
+        )
+
+        html = f"""
+        <html>
+        <body>
+            <h2>Rollback to a previous verified merged commit on 'main'</h2>
+            <form action="/rollback" method="post">
+                <label>Select commit:</label><br>
+                <select name="commit">{commit_options}</select><br><br>
+                <input type="hidden" name="branch" value="{branch}">
+                <label>Are you sure?</label><br>
+                <input type="checkbox" name="confirm" value="yes" required> Yes, I confirm<br><br>
+                <input type="submit" value="Rollback">
+            </form>
+        </body>
+        </html>
+        """
+        return Response(html, mimetype='text/html')
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error fetching verified merge commits: {e}")
+        return Response("Failed to fetch commits", status=500)
+
+@app.route('/rollback', methods=['POST'])
+def rollback():
+    # Handle JSON (API) or HTML form
+    if request.is_json:
+        data = request.get_json()
+        commit = data.get('commit')
+        branch = data.get('branch', 'main')
+        confirmed = True
+    else:
+        commit = request.form.get('commit')
+        branch = request.form.get('branch', 'main')
+        confirmed = request.form.get('confirm') == 'yes'
+
+    # Allow only rollback on main
+    if branch != 'main':
+        return Response("Rollback allowed only on 'main' branch", status=403)
+
+    if not commit or not confirmed:
+        return Response("Commit hash and confirmation required", status=400)
+
+    repo_path = os.path.join(CONFIG['prod_repo_path'], branch)
+
+    try:
+        # Ensure repo exists
+        if not os.path.exists(repo_path):
+            success = clone_repo(branch=branch)
+            if not success:
+                return Response("Failed to clone repo", status=500)
+
+        # Fetch latest refs
+        subprocess.run(['git', '-C', repo_path, 'fetch'], check=True)
+
+        # Checkout the specified commit (detached HEAD)
+        subprocess.run(['git', '-C', repo_path, 'checkout', commit], check=True)
+        logger.info(f"Checked out commit {commit} in detached HEAD state at {repo_path}")
+
+        # Deploy production
+        if deploy_to_production():
+            return Response("Rollback to commit and deployment successful", status=200)
+        else:
+            return Response("Checked out commit, but deployment failed", status=500)
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Rollback failed: {e}")
+        return Response(f"Git error during rollback: {e}", status=500)
 
 # Tries to get the value of an environment variable called GITHUB_SECRET.
 # If the environment variable is not set, it falls back to the default value: 'my_webhook'.
