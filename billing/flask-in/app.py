@@ -303,82 +303,92 @@ def export_to_excel():
 
 @app.route('/bill/<int:provider_id>', methods=['GET'])
 def get_bill(provider_id):
-    """Endpoint to generate billing report for a specific provider within a time range.
-    - URL params: t1 (start datetime), t2 (end datetime) in format yyyymmddhhmmss
-    - t1 default: first day of current month at 00:00:00
-    - t2 default: current datetime"""
+    # Parse optional from/to query params (format: YYYYMMDDHHMMSS)
+    now = datetime.now()
+    default_from = datetime(now.year, now.month, 1, 0, 0, 0)
+    default_to = now
 
-    # set default time "t1==from" "t2==to"
-    def parse_time(ts_str, label):
+    def parse_dt(dt_str):
         try:
-            return datetime.strptime(ts_str, "%Y%m%d%H%M%S")
-        except ValueError:
-            raise ValueError(f"Invalid format for {label}. Expected yyyymmddhhmmss.")
+            return datetime.strptime(dt_str, "%Y%m%d%H%M%S")
+        except:
+            return None
+
+    from_str = request.args.get("from")
+    to_str = request.args.get("to")
+
+    date_from = parse_dt(from_str) or default_from
+    date_to = parse_dt(to_str) or default_to
+
     try:
-        # Parse arguments
-        t1_str = request.args.get('t1')
-        t2_str = request.args.get('t2')
-        now = datetime.now()
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
 
-        # Default t1: first of current month at 00:00:00
-        if not t1_str:
-            t1 = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # Get provider info
+        cursor.execute("SELECT id, name FROM Provider WHERE id = %s", (provider_id,))
+        provider = cursor.fetchone()
+        if not provider:
+            conn.close()
+            return jsonify({"error": f"Provider ID {provider_id} not found"}), 404
+
+        # Get trucks for provider
+        cursor.execute("SELECT id FROM Trucks WHERE provider_id = %s", (provider_id,))
+        trucks = [row['id'] for row in cursor.fetchall()]
+        truck_count = len(trucks)
+
+        # Get sessions associated with these trucks within date range
+        # Assuming there's a Sessions table with truck_id, session_date columns
+        # Adjust table and column names as per your schema
+        if trucks:
+            format_from = date_from.strftime("%Y-%m-%d %H:%M:%S")
+            format_to = date_to.strftime("%Y-%m-%d %H:%M:%S")
+
+            # Get session IDs and count
+            format_strings = ','.join(['%s'] * len(trucks))  # placeholders for trucks
+            query_sessions = f"""
+                SELECT id FROM Sessions
+                WHERE truck_id IN ({format_strings})
+                  AND session_date BETWEEN %s AND %s
+            """
+            params = trucks + [format_from, format_to]
+            cursor.execute(query_sessions, params)
+            sessions = [row['id'] for row in cursor.fetchall()]
+            session_count = len(sessions)
         else:
-            t1 = parse_time(t1_str, 't1')
+            sessions = []
+            session_count = 0
 
-        # Default t2: current time
-        if not t2_str:
-            t2 = now
-        else:
-            t2 = parse_time(t2_str, 't2')
+        # Get product rates / totals - example
+        # Assuming Rates table and linking with sessions or trucks
+        # This depends on your schema, so this is a generic example:
+        # We'll just fetch all Rates for the provider's products as demo
 
-        if t1 > t2:
-            return jsonify({"error": "t1 must be before t2"}), 400
+        cursor.execute("""
+            SELECT product_id, rate, scope FROM Rates
+            WHERE product_id IN (
+                SELECT DISTINCT product_id FROM SessionsProducts
+                WHERE session_id IN (%s)
+            )
+        """ % (','.join(['%s']*session_count) if session_count > 0 else 'NULL'), tuple(sessions) if session_count > 0 else ())
+        )
+        rates = cursor.fetchall()
 
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
-    except Exception as e:
-        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+        conn.close()
 
-    total_bill = 0
-
-    # DB query to count trucks for this provider
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id FROM Trucks WHERE provider_id = %s", (provider_id,))
-    truck_ids = [row[0] for row in cursor.fetchall()]
-    truck_count = len(truck_ids)
-    # above line can be replace with:
-    # truck_count = cursor.fetchone()[0]
-    conn.close()
-
-    # Use mock API to count total sessions
-    session_count = 0
-    for truck_id in truck_ids:
-        try:
-            item_url = f"http://localhost:5500/mock/item/{truck_id}"
-            res = requests.get(item_url, timeout=5)
-
-            if res.status_code == 200:
-                data = res.json()
-                session_count += len(data.get("sessions", []))
-            elif res.status_code == 404:
-                continue  # skip if truck not found
-            else:
-                continue  # skip if other error
-        except requests.RequestException:
-            continue  # skip failed requests
-
-    return jsonify({
-            "provider_id": provider_id,
-            "from": t1.strftime("%Y-%m-%d %H:%M:%S"),
-            "to": t2.strftime("%Y-%m-%d %H:%M:%S"),
-            "truck_count": truck_count,
+        return jsonify({
+            "id": provider['id'],
+            "name": provider['name'],
+            "from": date_from.strftime("%Y%m%d%H%M%S"),
+            "to": date_to.strftime("%Y%m%d%H%M%S"),
+            "truckCount": truck_count,
+            "trucks": trucks,
             "sessionCount": session_count,
+            "sessions": sessions,
+            "rates": rates
+        })
 
-            "message": "Time range parsed successfully",
-            "total": total_bill
-    }), 200
+    except Error as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
