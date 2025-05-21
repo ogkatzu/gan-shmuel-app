@@ -16,6 +16,7 @@ def register_routes(app):
 
     @app.route('/session/<int:session_id>', methods=['GET'])
     def get_session(session_id):
+        auxillary_functions.print_debug("Entered route func")
         tx_list = Transaction.query.filter_by(session_id=session_id).all()
         if not tx_list:
             return jsonify({'error': 'Not found'}), 404
@@ -61,7 +62,7 @@ def register_routes(app):
         filename = request.json.get('file')
         if not filename:
             return jsonify({'error': 'Missing file parameter'}), 400
-        filepath = os.path.join('in', filename)
+        filepath = os.path.join('weight', 'in', filename)
         if not os.path.exists(filepath):
             return jsonify({'error': 'File not found'}), 400
         added = 0 
@@ -77,7 +78,7 @@ def register_routes(app):
         except Exception as e:
             return jsonify({'error': 'An error occurred', 'details': str(e)}), 500
 
-# only for show containers db in html
+    # only for show containers db in html
     @app.route("/containers", methods=["GET"])
     def get_containers():
         containers = Container.query.all()
