@@ -125,7 +125,8 @@ def register_routes(app):
                 "bruto": t.bruto,
                 "truckTara": t.truckTara,
                 "neto": t.neto,
-                "produce": t.produce
+                "produce": t.produce,
+                "session_id": t.session_id
             }
             for t in transactions
         ]
@@ -153,7 +154,7 @@ def register_routes(app):
         item_data = auxillary_functions.get_item_data(date_from=from_date, date_to=to_date, id=id)
         
         if item_data is None:
-            return jsonify({"error": "Item not found"}), 404
+            return jsonify({"Error": "Item not found within time range."}), 404
         
         return jsonify(item_data)
 

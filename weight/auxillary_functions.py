@@ -88,14 +88,19 @@ def get_item_data(date_from, date_to, id):
     final_to = parse_date(date_string=date_to, default_date=default_to)
 
     tara, transctions = find_transactions_by_id_and_time(id=id, start_time=final_from, end_time=final_to)
+    print_debug(f"transactions trucks are {transctions}")
+    container = None
     if transctions is None:
         transctions = find_transactions_by_container(container_id=id, start_time=final_from, end_time=final_to)
-        container: Container = db.session.query(Container).filter(Container.container_id == id).first()
+        print_debug(f"didn't find trucks.")
+        print_debug(f"transaciotns containers are {transctions}")
+        container = db.session.query(Container).filter(Container.container_id == id).first() if transctions else None
+        print_debug(f"containers are {container}")
         if container:
             unit, tara = lb_to_kg(unit=container.unit, weight=container.weight)
     
-    if transctions is None:
-        return f"ID {id} not found in requested time range.", 404
+    if transctions is None and container is None:
+        return None
     
     session_ids = []
     
