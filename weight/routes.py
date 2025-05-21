@@ -79,7 +79,7 @@ def register_routes(app):
             db.session.commit()
             msg =  f"Added {added}."
             msg_invalid = f"Added {added}, didn't upload {invalid_weight_field} due to invalid weight field."
-            return jsonify({'status': 'ok', 'added': msg if invalid_weight_field else msg_invalid })
+            return jsonify({'status': 'ok', 'added': msg if invalid_weight_field == 0 else msg_invalid })
         except Exception as e:
             return jsonify({'error': 'An error occurred', 'details': str(e)}), 500
 
