@@ -90,8 +90,10 @@ def get_item_data(date_from, date_to, id):
         return f"ID {id} not found in requested time range.", 404
     
     session_ids = []
+    
     for transaction in transctions:
         session_ids.append(transaction.session_id)
+    
     list(set(session_ids))
     for _item in session_ids:
         if _item is None:

@@ -143,7 +143,6 @@ def register_routes(app):
 
     @app.route('/item/<id>', methods=['GET'])
     def get_item(id):
-        
         from_date = request.args.get('from')
         to_date = request.args.get('to')
         
@@ -152,6 +151,6 @@ def register_routes(app):
         if item_data is None:
             return jsonify({"error": "Item not found"}), 404
         
-        return jsonify(item_data), 200
+        return jsonify(item_data)
 
 
