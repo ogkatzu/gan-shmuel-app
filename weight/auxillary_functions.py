@@ -253,7 +253,7 @@ def get_transactions_by_time_range(db_session,Transaction_model,from_time, to_ti
                 containers_list = t.containers.split(',')
             
             transaction_obj = {
-                "id": str(t.id),
+                "id": str(t.session_id),
                 "direction": t.direction,  
                 "bruto": t.bruto,          
                 "neto": t.neto if t.neto is not None else "na",  
