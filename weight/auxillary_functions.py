@@ -324,10 +324,10 @@ class truck_direction():
                 containers_tara = 'NA'
                 break
         neto = bruto - truck_tara - containers_tara
-        id = create_session_id(data['datetime']) #this is also the id - not session id - for out
-        if id_exists(session_id):
+        _id = create_session_id(data['datetime']) #this is also the id - not session id - for out
+        if id_exists(_id):
             return "ID already exists, can't have two entries at the same second.", 400
-        new_transaction = in_json_and_extras_to_transaciotn(in_json=entrance, truck_tara=truck_tara, neto=neto, exact_time=data['datetime'], id=id)
+        new_transaction = in_json_and_extras_to_transaciotn(in_json=entrance, truck_tara=truck_tara, neto=neto, exact_time=data['datetime'], id=_id)
         db.session.add(new_transaction)
         db.session.commit()
         ret = {'id': new_transaction.id, 'truck': new_transaction.truck, 'bruto': new_transaction.bruto, 'truckTara': new_transaction.truckTara, 'neto': new_transaction.neto}
