@@ -2,7 +2,7 @@ FROM python:3.11-alpine
 
 WORKDIR /app
 
-COPY api.py requirements.txt auxillary_functions.py /app/
+COPY api.py requirements.txt auxillary_functions.py classes_db.py routes.py /app/
 COPY templates/ /app/templates/
 COPY test/ /app/test/
 
