@@ -17,7 +17,7 @@ services:
       MYSQL_PASSWORD: weightpass
       MYSQL_HOST: weight_db1_test  # <-- Changed from weight_db1 to weight_db1_test
     volumes:
-      - ../test_env/${BRANCH_NAME}/weight/in:/app/in
+      - ${TEST_WEIGHT_PATH_IN}/${BRANCH_NAME}/weight/in:/app/in
   
   weight_db1_test:
     image: mysql:8
