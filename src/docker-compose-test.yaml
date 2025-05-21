@@ -13,7 +13,7 @@ services:
       TEST_HOST: ci-weight_app_test-1
       MYSQL_DATABASE: weightdb
       MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_USER: wightuser
+      MYSQL_USER: weightuser
       MYSQL_PASSWORD: weightpass
       MYSQL_HOST: weight_db1_test  # <-- Changed from weight_db1 to weight_db1_test
     volumes:
@@ -28,7 +28,7 @@ services:
     environment:
       MYSQL_DATABASE: weightdb
       MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_USER: wightuser
+      MYSQL_USER: weightuser
       MYSQL_PASSWORD: weightpass
     ports:
       - "3308:3306"
@@ -42,46 +42,53 @@ services:
       retries: 5
       start_period: 20s
 
-volumes:
-  db_data:
 
 
+  billing-app:
+    build:
+      context: ./billing/flask-in
+      dockerfile: Dockerfile
+    image: billing-app:1.0
+    container_name: billing-app
+    working_dir: /app
+    environment:
+      MYSQL_HOST: billdb
+      MYSQL_USER: root
+      MYSQL_PASSWORD: 123456         # ✅ Must match MYSQL_ROOT_PASSWORD from billdb
+      MYSQL_DATABASE: billingdb
+    ports:
+      - "5500:5500"
+    volumes:
+      - ./billing/flask-in/in:/app/in
+    depends_on:
+      - billdb
+    networks:
+      - backend
+    restart: unless-stopped
 
+  billdb:
+    image: mysql:5.7
+    container_name: billdb
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456    # ✅ Must match billing-app's MYSQL_PASSWORD
+      MYSQL_DATABASE: billingdb
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./billing/billdb:/docker-entrypoint-initdb.d
+      - billing-data:/var/lib/mysql
+    networks:
+      - backend
+    restart: unless-stopped
 
-# billing-app:
-#     image: python:3.12-slim
-#     container_name: billing-app
-#     working_dir: /app
-#     volumes:
-#       - ../test_env/billing/flask-in:/app
-#     command: /bin/sh -c "pip install --no-cache-dir -r requirements.txt && flask run --host=0.0.0.0 --port=5000"
-#     environment:
-#       - FLASK_APP=app.py
-#       - FLASK_ENV=development
-#       - MYSQL_HOST=billdb
-#       - MYSQL_USER=root
-#       - MYSQL_PASSWORD=root
-#       - MYSQL_DATABASE=billdb
-#     ports:
-#       - "5500:5500"
-#     depends_on:
-#       - billdb
-#     networks:
-#     - mynet
+  volumes:
+    billing-data:
+    db_data:
 
-# billdb:
-#     image: mysql:5.7
-#     container_name: billdb
-#     environment:
-#       MYSQL_ROOT_PASSWORD: root
-#       MYSQL_DATABASE: billdb
-#     ports:
-#       -3309:3306
-#     volumes:
-#       - ../test_env/billing/billdb:/docker-entrypoint-initdb.d
-#     networks:
-#       - mynet
 
 networks:
+  backend:
+    driver: bridge
+    external: true
   weight-network_test:
     external: true
