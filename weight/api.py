@@ -22,6 +22,7 @@ def create_app():
         from classes_db import Container, Transaction 
         db.create_all()
     
+
     return app
 
 if __name__ == '__main__':
