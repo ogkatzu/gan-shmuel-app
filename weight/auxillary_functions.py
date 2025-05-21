@@ -299,16 +299,16 @@ class truck_direction():
             prev_record = json.loads(data['prev_record'])
             if prev_record['direction'] == 'in':
                 if not data['force']:
-                    return 'Two in in a row without an out.', 400
+                    return {'error': 'Two in in a row without an out.'}, 400
                 elif prev_record['truck'] != data['truck']:
-                        return 'Bad Request', 400 # better text, unsure can happen
+                        return {'error': 'Bad Request'}, 400 # better text, unsure can happen
                 else:
                     session_id = prev_record['session_id']
                     already_exists = True
         except KeyError:
             session_id = create_session_id(data['datetime'])
             if id_exists(session_id):
-                return "ID already exists, can't have two entries at the same second.", 400
+                return {'error': "ID already exists, can't have two entries at the same second."}, 400
         data['unit'], data['weight'] = lb_to_kg(data['unit'], data['weight'])
         data['bruto'] = data['weight']
         new_transaction = create_transaction_from_data_and_session_id(data=data, session_id=session_id)
@@ -324,9 +324,9 @@ class truck_direction():
             return "No in for this out", 400
         if entrance['direction'] == 'out':
             if not data['force']:
-                    return 'Two outs is a row without force', 400
+                    return {'error': 'Two outs is a row without force'}, 400
             elif entrance['truck'] != data['truck']:
-                return 'Bad Request', 400 # better text
+                return {'error': 'Bad Request'}, 400 # better text
         bruto = entrance['bruto']
         truck_tara = data['weight']
         containers_tara = 0
@@ -345,7 +345,7 @@ class truck_direction():
             neto = bruto - truck_tara - containers_tara
         _id = create_session_id(data['datetime']) #this is also the id - not session id - for out
         if id_exists(_id):
-            return "ID already exists, can't have two entries at the same second.", 400
+            return {'error': "ID already exists, can't have two entries at the same second."}, 400
         new_transaction = in_json_and_extras_to_transaciotn(in_json=entrance, truck_tara=truck_tara, neto=neto, exact_time=data['datetime'], id=_id)
         db.session.add(new_transaction)
         db.session.commit()
@@ -366,7 +366,7 @@ class truck_direction():
         new_tansaction.neto = new_tansaction.bruto - container_tara
         new_tansaction.id = new_tansaction.session_id = create_session_id(data['datetime'])
         if id_exists(new_tansaction.id):
-            return "ID already exists, can't have two entries at the same second.", 400
+            return {'error': "ID already exists, can't have two entries at the same second."}, 400
         new_tansaction.direction = 'none'
         new_tansaction.produce = data['produce']
         new_tansaction.truck = 'na'
