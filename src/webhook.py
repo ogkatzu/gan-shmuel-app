@@ -296,15 +296,16 @@ def webhook():
             if 'billing' in branch:
                 emails = json.loads(CONFIG['billing_emails'])
 
-        for email in emails.values():
-            Msg = build_email("FAILED - PR", email, f"Test Results:\n{result_message}\n\nTest Output:\n{test_output}")
-            send_email(Msg, email)
-            
-        emails = json.loads(CONFIG['devops_emails'])
-        for email in emails.values():
-            Msg = build_email("FAILED - PR", email, f"Test Results:\n{result_message}\n\nTest Output:\n{test_output}")
-            send_email(Msg, email)
-        else:
+            for email in emails.values():
+                Msg = build_email("FAILED - PR", email, f"Test Results:\n{result_message}\n\nTest Output:\n{test_output}")
+                send_email(Msg, email)
+                
+            emails = json.loads(CONFIG['devops_emails'])
+            for email in emails.values():
+                Msg = build_email("FAILED - PR", email, f"Test Results:\n{result_message}\n\nTest Output:\n{test_output}")
+                send_email(Msg, email)
+        
+        if tests_passed:
             send_email_to_all("PASSED - PR" , f"Test Results:\n{result_message}\n\nTest Output:\n{test_output}")
 
     else:
