@@ -7,6 +7,13 @@ from flask import jsonify
 
 from classes_db import Container, Transaction, db
 
+def container_has_weight_in_table(container_id):
+    container = Container.query.get(container_id)
+    has_weight = True
+    if container.weight is None or container.weight < 1:
+        has_weight = False
+    return has_weight
+
 def id_exists(_id):
     already_exists = db.session.query(Transaction).filter(Transaction.id==_id).first()
     ret = False
@@ -348,7 +355,9 @@ class truck_direction():
         new_tansaction = Transaction()
         new_tansaction.bruto = data['weight']
         container_id = data['containers'][0] # אthis implementation of none only accepts single container
-        container = containers = db.session.query(Container).filter_by(container_id=container_id).first()
+        container = db.session.query(Container).filter_by(container_id=container_id).first()
+        if not container or not container_has_weight_in_table(container_id=container_id):
+            return {"error": "Container is not in container database, cannot calculate neto."}, 404
         unit, container_tara = lb_to_kg(container.unit ,container.weight)
         new_tansaction.truckTara = container_tara #should this be the case?
         new_tansaction.containers = [container]

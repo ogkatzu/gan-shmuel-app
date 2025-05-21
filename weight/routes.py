@@ -105,7 +105,7 @@ def register_routes(app):
             try:
                 if tx.containers and tx.containers != "":
                     for cid in json.loads(tx.containers):  
-                        if cid and not Container.query.get(cid):  
+                        if (cid and not Container.query.get(cid)) or not auxillary_functions.container_has_weight_in_table(cid):
                             ids.add(cid)
             except json.JSONDecodeError:
                 print(f"Invalid JSON in tx.containers (tx id {tx.id}):", tx.containers)
