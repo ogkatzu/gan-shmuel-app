@@ -6,7 +6,7 @@ import csv
 
 from classes_db import Container, Transaction, db
 import auxillary_functions
-
+from auxillary_functions import print_debug
 
 def register_routes(app):
    
@@ -102,15 +102,17 @@ def register_routes(app):
         unknown = Transaction.query.all()  
         ids = set()  
         for tx in unknown:  
-            if tx.containers and tx.containers != "":
-                auxillary_functions.print_debug("--------------")
-                auxillary_functions.print_debug(f"containers is {tx.containers}, tx.id is {tx.id}")
-                for cid in json.loads(tx.containers):  
-                    if cid and not Container.query.get(cid):  
-                        ids.add(cid)  
+            try:
+                if tx.containers and tx.containers != "":
+                    for cid in json.loads(tx.containers):  
+                        if cid and not Container.query.get(cid):  
+                            ids.add(cid)
+            except json.JSONDecodeError:
+                print(f"Invalid JSON in tx.containers (tx id {tx.id}):", tx.containers)
+                continue
   
         return jsonify(list(ids))  
-
+    
     # only for show transactions db in html
     @app.route("/transactions", methods=["GET"])
     def get_transactions():
@@ -127,6 +129,7 @@ def register_routes(app):
                 "neto": t.neto,
                 "produce": t.produce,
                 "session_id": t.session_id
+
             }
             for t in transactions
         ]

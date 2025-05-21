@@ -304,21 +304,23 @@
 <div id="itemResultWrapper">
   <p id="itemMessage">Enter item ID and click fetch</p>
   <table class="table table-bordered table-hover" id="itemResultTable" style="display: none;">
-    <thead class="table-dark">
-      <tr>
-        <th>ID</th>
-        <th>Tara</th>
-        <th>Sessions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td id="itemIdCell"></td>   
-        <td id="itemTaraCell"></td>
-        <td id="itemSessionsCell"></td>
-      </tr>
-    </tbody>
-  </table>
+  <thead class="table-dark">
+    <tr>
+      <th>ID</th>
+      <th>Tara</th>
+      <th>Unit</th>
+      <th>Sessions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td id="itemIdCell"></td>   
+      <td id="itemTaraCell"></td>
+      <td id="itemUnitCell"></td>
+      <td id="itemSessionsCell"></td>
+    </tr>
+  </tbody>
+</table>
 </div>
       </div>
 
@@ -500,7 +502,8 @@ function fetchItem() {
   const to = document.getElementById("itemTo").value;
 
   if (!id) {
-    document.getElementById("itemResult").textContent = "Please enter item ID.";
+    document.getElementById("itemMessage").textContent = "Please enter item ID.";
+    document.getElementById("itemResultTable").style.display = "none";
     return;
   }
 
@@ -509,15 +512,28 @@ function fetchItem() {
   if (to) query.append("to", to);
 
   fetch(`/item/${id}?${query.toString()}`)
-    .then(res => {
-      if (!res.ok) throw new Error("Item not found");
-      return res.json();
-    })
-    .then(data => {
-      document.getElementById("itemResult").textContent = JSON.stringify(data, null, 2);
+    .then(async res => {
+      const contentType = res.headers.get("Content-Type");
+      const isJson = contentType && contentType.includes("application/json");
+      const data = isJson ? await res.json() : await res.text();
+
+      if (!res.ok) {
+        // אם זה JSON עם שדה error – נציג אותו, אחרת נציג את הטקסט
+        const message = data?.error || (typeof data === "string" ? data : "Unknown error");
+        throw new Error(message);
+      }
+
+      document.getElementById("itemIdCell").textContent = data.id || id;
+      document.getElementById("itemTaraCell").textContent = data.tara ?? "N/A";
+      document.getElementById("itemUnitCell").textContent = data.unit ?? "N/A";
+      document.getElementById("itemSessionsCell").textContent = Array.isArray(data.sessions) ? data.sessions.join(', ') : 'N/A';
+
+      document.getElementById("itemMessage").textContent = "";
+      document.getElementById("itemResultTable").style.display = "table";
     })
     .catch(err => {
-      document.getElementById("itemResult").textContent = err.message;
+      document.getElementById("itemMessage").textContent = err.message;
+      document.getElementById("itemResultTable").style.display = "none";
     });
 }
 

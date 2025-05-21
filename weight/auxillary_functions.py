@@ -113,6 +113,8 @@ def get_item_data(date_from, date_to, id):
             session_ids.remove(_item)
     
     ret = {"id": id, "tara": tara if tara else 'na', 'sessions': session_ids, 'unit': 'kg'}
+    print_debug(ret)
+
     return ret
 
 def find_transactions_by_id_and_time(id, start_time, end_time):

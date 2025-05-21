@@ -127,6 +127,8 @@ def test_get_item():
     assert "tara" in data
     assert "sessions" in data
     # Test with a non-existent ID
+
+def test_get_item_non_existing():
     nonexistent_id = "EEEEE123456"
     response_nonexistent = requests.get(f"{BASE_URL}/item/{nonexistent_id}")
     assert response_nonexistent.status_code == 404

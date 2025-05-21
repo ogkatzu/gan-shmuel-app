@@ -91,7 +91,7 @@ def test_get_transactions_by_time_range_returns_correct_format(mock_db_session_a
     assert isinstance(results, list)
     assert len(results) == 1
     item = results[0]
-    assert item["id"] == "1"
+    assert item["id"] == 1
     assert item["direction"] == "in"
     assert item["bruto"] == 12000
     assert item["neto"] == 10000
