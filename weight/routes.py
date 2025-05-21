@@ -102,7 +102,9 @@ def register_routes(app):
         unknown = Transaction.query.all()  
         ids = set()  
         for tx in unknown:  
-            if tx.containers:  
+            if tx.containers and tx.containers != "":
+                auxillary_functions.print_debug("--------------")
+                auxillary_functions.print_debug(f"containers is {tx.containers}, tx.id is {tx.id}")
                 for cid in json.loads(tx.containers):  
                     if cid and not Container.query.get(cid):  
                         ids.add(cid)  
