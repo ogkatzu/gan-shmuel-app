@@ -46,6 +46,7 @@ def register_routes(app):
     @app.route('/weight', methods=['POST'])
     def post_weight():
         data = request.get_json()
+
         if not data['direction'] == 'none':
             prev_record = db.session.query(Transaction).filter(Transaction.truck == data.get('truck')).order_by(Transaction.datetime.desc()).first()
             if prev_record:

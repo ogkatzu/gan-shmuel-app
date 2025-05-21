@@ -7,6 +7,9 @@ from flask import jsonify
 
 from classes_db import Container, Transaction, db
 
+# def check_id():
+
+
 def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_time, id):
     new_transaction = Transaction()
     new_transaction.id = id
@@ -84,7 +87,8 @@ def get_item_data(date_from, date_to, id):
     if transctions is None:
         transctions = find_transactions_by_container(container_id=id, start_time=final_from, end_time=final_to)
         container: Container = db.session.query(Container).filter(Container.container_id == id).first()
-        unit, tara = lb_to_kg(unit=container.unit, weight=container.weight)
+        if container:
+            unit, tara = lb_to_kg(unit=container.unit, weight=container.weight)
     
     if transctions is None:
         return f"ID {id} not found in requested time range.", 404
@@ -267,6 +271,7 @@ def get_transactions_by_time_range(db_session,Transaction_model,from_time, to_ti
     
 class truck_direction():
 
+
     def truck_in(data: json):
         session_id = None
         already_exists = False
@@ -274,7 +279,7 @@ class truck_direction():
             prev_record = json.loads(data['prev_record'])
             if prev_record['direction'] == 'in':
                 if not data['force']:
-                    return 'Bad Request', 400
+                    return 'Two in in a row without an out.', 400
                 elif prev_record['truck'] != data['truck']:
                         return 'Bad Request', 400 # better text, unsure can happen
                 else:
