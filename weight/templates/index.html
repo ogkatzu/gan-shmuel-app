@@ -127,9 +127,21 @@
 </ul> -->
 
     <div class="tab-content mt-4">
-      <div class="tab-pane fade show active" id="unknown" role="tabpanel">
+    
+
+ <div class="tab-pane fade show active" id="unknown" role="tabpanel">
         <!-- <h4>Unknown Containers</h4> -->
-        <pre id="unknownResult">Loading...</pre>
+        <p id="containersCount"></p>
+        <div class="table-container">
+          <table class="table table-hover table-bordered" id="unknownResult">
+            <thead class="table-dark">
+              <tr>
+                <th>Container ID</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
 
       <div class="tab-pane fade" id="session" role="tabpanel">
@@ -301,12 +313,23 @@
 
   <!-- Scripts -->
   <script>
-    // Load unknown containers
-    fetch("/unknown")
-      .then((res) => res.json())
-      .then((data) => {
-        document.getElementById("unknownResult").textContent = JSON.stringify(data, null, 2);
-      });
+   // Load unknown containers
+fetch("/unknown")
+  .then((res) => res.json())
+  .then((data) => {
+    const tbody = document.querySelector("#unknownResult tbody");
+    tbody.innerHTML = "";
+
+    data.forEach((containerId) => {
+      const row = `<tr><td>${containerId}</td></tr>`;
+      tbody.innerHTML += row;
+    });
+
+    document.getElementById("containersCount").textContent = `Total unknown containers: ${data.length}`;
+  })
+  .catch((error) => {
+    console.error("Error loading unknown containers:", error);
+  });
 
     // Fetch session info
     function fetchSession() {
@@ -444,7 +467,7 @@ document.getElementById("postWeightForm").addEventListener("submit", async funct
     const result = await response.json();
     document.getElementById("postWeightResult").textContent = JSON.stringify(result, null, 2);
   } catch (error) {
-    document.getElementById("postWeightResult").textContent = "Error submitting weight data.";
+    document.getElementById("postWeightResult").textContent = "Error submitting weight data: " + error.message;
   }
 });
 
