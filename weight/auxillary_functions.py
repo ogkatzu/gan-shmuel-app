@@ -35,7 +35,7 @@ def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_tim
     new_transaction. truckTara = truck_tara
     return new_transaction
 
-def handle_json_in_file(filepath, added, total_num_of_containers):
+def handle_json_in_file(filepath, added, invalid_weight_field):
     with open(filepath) as jsonfile:
             data = json.load(jsonfile)
             if not isinstance(data, list):
@@ -49,7 +49,7 @@ def handle_json_in_file(filepath, added, total_num_of_containers):
                 try:
                     weight = float(weight)
                 except ValueError:
-                    total_num_of_containers += 1
+                    invalid_weight_field += 1
                     continue  # Skip invalid weights
                 existing = Container.query.get(cid)
                 if existing:
@@ -59,9 +59,9 @@ def handle_json_in_file(filepath, added, total_num_of_containers):
                     new = Container(container_id=cid, weight=weight, unit=unit)
                     db.session.add(new)
                 added += 1
-    return added, total_num_of_containers
+    return added, invalid_weight_field
 
-def handle_csv_in_file(filepath, added, total_num_of_containers):
+def handle_csv_in_file(filepath, added, invalid_weight_field):
     with open(filepath, newline='') as csvfile:
             reader = csv.reader(csvfile)
             headers = next(reader, None)  
@@ -75,7 +75,7 @@ def handle_csv_in_file(filepath, added, total_num_of_containers):
                 try:
                     weight = float(row[1])
                 except ValueError:
-                    total_num_of_containers += 1
+                    invalid_weight_field += 1
                     continue  # Skip rows with invalid weight
                 if not cid:
                     continue  # Skip empty container ID
@@ -87,7 +87,7 @@ def handle_csv_in_file(filepath, added, total_num_of_containers):
                     new = Container(container_id=cid, weight=weight, unit=unit)
                     db.session.add(new)
                 added += 1
-    return added, total_num_of_containers
+    return added, invalid_weight_field
 
 def get_item_data(date_from, date_to, id):
     default_from = datetime.now().replace(day=1, hour=00, minute=00, second=00, microsecond=00)

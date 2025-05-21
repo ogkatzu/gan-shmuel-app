@@ -68,16 +68,18 @@ def register_routes(app):
         if not os.path.exists(filepath):
             return jsonify({'error': 'File not found'}), 400
         added = 0 
-        total_num_of_containers = 0
+        invalid_weight_field = 0
         try:
             if filename.endswith('.csv'):
-                added, total_num_of_containers = auxillary_functions.handle_csv_in_file(filepath, added, total_num_of_containers)
+                added, invalid_weight_field = auxillary_functions.handle_csv_in_file(filepath, added, invalid_weight_field)
             elif filename.endswith('.json'):
-                added, total_num_of_containers = auxillary_functions.handle_json_in_file(filepath, added, total_num_of_containers)
+                added, invalid_weight_field = auxillary_functions.handle_json_in_file(filepath, added, invalid_weight_field)
             else:
                 return jsonify({'error': 'Unsupported file format'}), 400
             db.session.commit()
-            return jsonify({'status': 'ok', 'added': f"Added {added} out of {total_num_of_containers}."})
+            msg =  f"Added {added}."
+            msg_invalid = f"Added {added}, didn't upload {invalid_weight_field} due to invalid weight field."
+            return jsonify({'status': 'ok', 'added': msg if invalid_weight_field else msg_invalid })
         except Exception as e:
             return jsonify({'error': 'An error occurred', 'details': str(e)}), 500
 
