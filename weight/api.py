@@ -463,7 +463,9 @@ def get_transactions():
             "bruto": t.bruto,
             "truckTara": t.truckTara,
             "neto": t.neto,
-            "produce": t.produce
+            "produce": t.produce,
+            "session_id": t.session_id  
+
         }
         for t in transactions
     ]

@@ -131,7 +131,7 @@
 
  <div class="tab-pane fade show active" id="unknown" role="tabpanel">
         <!-- <h4>Unknown Containers</h4> -->
-        <p id="containersCount"></p>
+        <p id="unknownContainersCount"></p>
         <div class="table-container">
           <table class="table table-hover table-bordered" id="unknownResult">
             <thead class="table-dark">
@@ -189,6 +189,8 @@
                 <th>Truck Tara</th>
                 <th>Neto</th>
                 <th>Produce</th>
+                <th>Session Id</th>
+
               </tr>
             </thead>
             <tbody></tbody>
@@ -311,7 +313,7 @@
     </thead>
     <tbody>
       <tr>
-        <td id="itemIdCell"></td>
+        <td id="itemIdCell"></td>   
         <td id="itemTaraCell"></td>
         <td id="itemSessionsCell"></td>
       </tr>
@@ -343,7 +345,7 @@ fetch("/unknown")
       tbody.innerHTML += row;
     });
 
-    document.getElementById("containersCount").textContent = `Total unknown containers: ${data.length}`;
+    document.getElementById("unknownContainersCount").textContent = `Total unknown containers: ${data.length}`;
   })
   .catch((error) => {
     console.error("Error loading unknown containers:", error);
@@ -382,27 +384,29 @@ fetch("/unknown")
       });
 
     // Load transactions
-    fetch("/transactions")
-      .then((res) => res.json())
-      .then((data) => {
-        document.getElementById("transactionsCount").textContent = `Total transactions: ${data.count}`;
-        const tbody = document.querySelector("#transactionsTable tbody");
-        tbody.innerHTML = "";
-        data.transactions.forEach((t) => {
-          const row = `<tr>
-            <td>${t.id}</td>
-            <td>${t.datetime}</td>
-            <td>${t.direction}</td>
-            <td>${t.truck}</td>
-            <td>${t.containers}</td>
-            <td>${t.bruto}</td>
-            <td>${t.truckTara ?? ""}</td>
-            <td>${t.neto ?? ""}</td>
-            <td>${t.produce}</td>
-          </tr>`;
-          tbody.innerHTML += row;
-        });
-      });
+fetch("/transactions")
+  .then((res) => res.json())
+  .then((data) => {
+    document.getElementById("transactionsCount").textContent = `Total transactions: ${data.count}`;
+    const tbody = document.querySelector("#transactionsTable tbody");
+    tbody.innerHTML = "";
+    data.transactions.forEach((t) => {
+      const row = `<tr>
+        <td>${t.id}</td>
+        <td>${t.datetime}</td>
+        <td>${t.direction}</td>
+        <td>${t.truck}</td>
+        <td>${t.containers}</td>
+        <td>${t.bruto}</td>
+        <td>${t.truckTara ?? ""}</td>
+        <td>${t.neto ?? ""}</td>
+        <td>${t.produce}</td>
+        <td>${t.session_id ?? ""}</td>
+      </tr>`;
+      tbody.innerHTML += row;
+    });
+  });
+
 
     // Batch weight
     document.getElementById("batchWeightForm").addEventListener("submit", async function (event) {
