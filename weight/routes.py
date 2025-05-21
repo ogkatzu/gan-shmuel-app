@@ -24,7 +24,8 @@ def register_routes(app):
         result = {
             'id': tx.id,
             'truck': tx.truck,
-            'bruto': tx.bruto
+            'bruto': tx.bruto,
+            'produce': tx.produce
         }
         if tx.direction == 'out':
             result['truckTara'] = tx.truckTara
