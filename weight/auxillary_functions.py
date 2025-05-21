@@ -314,6 +314,7 @@ class truck_direction():
         bruto = entrance['bruto']
         truck_tara = data['weight']
         containers_tara = 0
+        neto = 0
         container_ids = entrance['containers']
         containers = db.session.query(Container).filter(Container.container_id.in_(container_ids)).all()
         for container in containers:
@@ -321,9 +322,11 @@ class truck_direction():
                 container.unit, container.weight = lb_to_kg(container.unit, container.weight)
                 containers_tara += container.weight
             else:
-                containers_tara = 'NA'
+                containers_tara = 'na'
+                neto = 'na'
                 break
-        neto = bruto - truck_tara - containers_tara
+        if neto == 0:
+            neto = bruto - truck_tara - containers_tara
         _id = create_session_id(data['datetime']) #this is also the id - not session id - for out
         if id_exists(_id):
             return "ID already exists, can't have two entries at the same second.", 400
