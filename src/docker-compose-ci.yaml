@@ -2,6 +2,9 @@ services:
   ci-runner:
     image: docker:28.1.1-cli
     container_name: ci-runner
+    privileged: true
+    networks:
+      - weight-network
     ports:
       - "8080:8080"
     working_dir: /app
@@ -15,11 +18,17 @@ services:
       - .:/app
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
+    env_file:
+      - .env
     command: >
       sh -c "
       apk add --no-cache python3 py3-pip git &&
       python3 -m venv venv &&
       source venv/bin/activate &&
       pip install -r requirements.txt &&
+      echo 'Setup complete. Container is idle.' &&
       python3 webhook.py"
- 
+#python3 webhook.py"
+networks:
+  weight-network:
+    external: true

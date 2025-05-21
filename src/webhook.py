@@ -1,4 +1,4 @@
-from flask import Flask, request, Response
+from flask import Flask, request, Response, abort
 import hmac
 import hashlib
 import os
@@ -44,6 +44,7 @@ CONFIG = {
 }
 
 def build_email(Subject, To, Msg):
+    logger.info(f"Sending email to: {To}")
     message = MIMEText(Msg)
     message["Subject"] = Subject
     message["From"] = CONFIG['email_sender']
@@ -54,6 +55,8 @@ def build_email(Subject, To, Msg):
 def send_email(message, receiver_email):
     logger.info("Sending email")
     context = ssl.create_default_context()
+    ######## TODO: REMOVE THIS LINE ##########
+    return "mail sent"
     with smtplib.SMTP(CONFIG['smtp_server'], CONFIG['smtp_port']) as server:
         server.ehlo()  # Can be omitted
         server.starttls(context=context)
@@ -65,7 +68,8 @@ def send_email(message, receiver_email):
 def setup_test_env():
     logger.info("Setting up test environment")
     try:
-        subprocess.run(['docker', 'compose', '-f', 'docker-compose-test.yaml', 'up'], check=True)
+        ######## TODO: REPLACEWITH TEST ENV ##########
+        subprocess.run(['docker', 'compose', '-f', CONFIG["repo_path"] + '/' + 'weight' + '/' + 'docker-compose-deploy.yaml', 'up', '-d'], check=True)
         logger.info("Test environment setup complete")
         return True
     
@@ -76,7 +80,8 @@ def setup_test_env():
 
 def test_env_down_and_clean():
     logger.info("Tearing down test environment")
-    subprocess.run(['docker', 'compose', '-f', 'docker-compose-test.yaml', 'down'], check=True)
+    ######## TODO: REPLACEWITH TEST ENV ##########
+    subprocess.run(['docker', 'compose', '-f', 'docker-compose-deploy.yaml', 'down'], check=True)
     subprocess.run(['rm', '-rf', CONFIG['workdir_test'] + '/' + CONFIG['repo_path']])
     return True
 
@@ -88,16 +93,20 @@ def run_tests(branch):
         # Run tests through docker-compose exec
         # Assuming there's a main service where tests should run
         # TODO - Update this to run tests in the correct service
-        if not os.path.exists(CONFIG['workdir_test'] + '/' + CONFIG['repo_path']):
-            subprocess.run(['git', 'clone', '--branch', branch, CONFIG['repo_url'],CONFIG['workdir_test'] + '/' + CONFIG['repo_path']], check=True)
-
+        if not os.path.exists(CONFIG['workdir_test'] + CONFIG['repo_path']):
+            logger.info(f"Cloning repo {CONFIG['repo_url']} branch {branch} to {CONFIG['workdir_test'] + CONFIG['repo_path']}")
+            subprocess.run(['pwd'], check=True)
+            subprocess.run(['ls'], check=True)
+            subprocess.run(['git', 'clone', '--branch', branch, CONFIG['repo_url'],CONFIG['workdir_test'] + CONFIG['repo_path']], check=True)
+            subprocess.run(['ls', '-la', CONFIG['workdir_test'] + CONFIG['repo_path']], check=True)
+        # subprocess.run(['cd','test_env/gan-shmuel-app/weight/test/' ], check=True)
         #billing_command = ["pyestest", "test_env/gan-shmuel-app/billing/test/test_api.py"]
-        wieght_command = ["pyestest", "test_env/gan-shmuel-app/weight/test/test_api.py"]
+        wieght_command = ["pytest", "test_api.py"]
 
         logger.info(f"Running tests wieght")
         result_wieght = subprocess.run(
             wieght_command,
-            cwd=CONFIG['workdir_test'],
+            cwd="test_env/app/gan-shmuel-app/weight/test/",
             capture_output=True,
             text=True
         )
@@ -171,8 +180,11 @@ def clone_repo(repo_url, branch, is_local=False):
 def fetch_branch(branch):
     try:
         logger.info(f"Fetching branch: {branch}")
+        logger.info(f"Fetching repo path to: {CONFIG['repo_path']}")
+        subprocess.run(['ls', '-la', CONFIG['repo_path']], check=True)
         subprocess.run(['git', '-C', CONFIG['repo_path'], 'fetch', 'origin'], check=True)
-        subprocess.run(['git', 'checkout', branch], check=True)
+
+        subprocess.run(['git', '-C', CONFIG['repo_path'], 'checkout', branch], check=True)
         subprocess.run(['git', '-C', CONFIG['repo_path'], 'pull', 'origin', branch], check=True)
         logger.info(f"Successfully checked out branch: {branch}")
         return True
@@ -181,6 +193,8 @@ def fetch_branch(branch):
         return False
 
 def send_email_to_all(Subject, Msg):
+    ######## TODO: REMOVE THIS LINE ##########
+    return "mail sent"
     emails = json.loads(CONFIG['weight_emails'])
     for email in emails.values():
         msg = build_email(Subject, email, Msg)
@@ -207,12 +221,16 @@ def webhook():
     
     signature = request.headers.get('X-Hub-Signature-256')
     # Get payload
-    payload = request.json
+    payload = request.get_data()
     branch =''
 
+    # logger.info("Header:", signature)
+    # logger.info("Expected:", CONFIG['github_secret'])
+
     if not verify_signature(payload, signature):# check if the request from github
-      os.abort(401, 'Signature verification failed')
-    
+        logger.error("Signature verification failed")
+        abort(401, description='Signature verification failed')
+    payload = request.json
     # Extract information
     is_merge_to_main = False
     is_pr = False
@@ -221,7 +239,7 @@ def webhook():
 
  
     # Check if it's a push to main
-    if 'ref' in payload and payload['ref'] == f"refs/heads/main":
+    if payload.get("action") == "closed" and payload.get("pull_request", {}).get("merged") is True and payload["pull_request"]["base"]["ref"] == "main":
         is_merge_to_main = True
         repo_url = CONFIG['repo_url']
         branch = 'main'
@@ -343,17 +361,46 @@ def health():
 # Tries to get the value of an environment variable called GITHUB_SECRET.
 # If the environment variable is not set, it falls back to the default value: 'my_webhook'.
 def verify_signature(payload, signature_header):
+    """
+    Verify that the payload was sent from GitHub by validating the signature.
+    
+    Args:
+        payload (bytes): Raw request body data
+        signature_header (str): GitHub signature from X-Hub-Signature-256 header
+        
+    Returns:
+        bool: True if signature is valid, False otherwise
+    """
     if signature_header is None:
         return False
-
-    sha_name, signature = signature_header.split('=')
-    if sha_name != 'sha256':
+    
+    try:
+        # Split the signature header into algorithm and signature
+        sha_name, signature = signature_header.split('=')
+        if sha_name != 'sha256':
+            return False
+        
+        # Make sure our key is bytes
+        secret = CONFIG['github_secret']
+        if not isinstance(secret, bytes):
+            secret = secret.encode('utf-8')
+        
+        # Make sure payload is bytes
+        if not isinstance(payload, bytes):
+            try:
+                payload = payload.encode('utf-8')
+            except (AttributeError, TypeError):
+                return False
+        
+        # Calculate the HMAC
+        mac = hmac.new(secret, msg=payload, digestmod=hashlib.sha256)
+        calculated_signature = mac.hexdigest()
+        
+        # Use constant time comparison to prevent timing attacks
+        return hmac.compare_digest(calculated_signature, signature)
+    except Exception as e:
+        app.logger.error(f"Signature verification error: {str(e)}")
         return False
-
-    mac = hmac.new(CONFIG['github_secret'].encode(), msg=payload, digestmod=hashlib.sha256)
-    expected_signature = mac.hexdigest()
-    return hmac.compare_digest(expected_signature, signature)
-
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=True)
