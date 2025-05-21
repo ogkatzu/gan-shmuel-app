@@ -157,7 +157,7 @@ def register_routes(app):
         item_data = auxillary_functions.get_item_data(date_from=from_date, date_to=to_date, id=id)
         
         if item_data is None:
-            return jsonify({"Error": "Item not found within time range."}), 404
+            return jsonify({"error": "Item not found within time range."}), 404
         
         return jsonify(item_data)
 
