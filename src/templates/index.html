@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Docker Container Status</title>
+  <meta http-equiv="refresh" content="5" />
+  <style>
+    :root {
+      --background: #181a20;
+      --card-bg: #23262f;
+      --header-bg: #1e2128;
+      --row-alt: #23262f;
+      --row-main: #20232a;
+      --text: #e0e0e0;
+      --primary: #2dce89;
+      --danger: #ff3860;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+      --border: #31343c;
+      --status-bg: #23262f;
+      --status-border: #31343c;
+    }
+
+    body {
+       font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      background: var(--background);
+      color: var(--text);
+      padding: 2rem;
+      margin: 0;
+      min-height: 100vh;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--primary);
+      text-shadow: 0 2px 8px rgba(45,206,137,0.08);
+    }
+    table {
+      width: 90%;
+      max-width: 900px;
+      margin: 0 auto;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: var(--card-bg);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    th, td {
+      padding: 1.2rem 1rem;
+      text-align: left;
+    }
+    th {
+      background-color: var(--header-bg);
+      color: var(--primary);
+      font-size: 1.07rem;
+      border-bottom: 2px solid var(--border);
+      letter-spacing: 0.5px;
+    }
+    tr {
+      transition: background 0.18s;
+    }
+    tr:nth-child(even) {
+      background-color: var(--row-alt);
+    }
+    tr:nth-child(odd) {
+      background-color: var(--row-main);
+    }
+    tr:hover {
+      background: #22262f;
+    }
+    .status-box {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.5rem 1.1rem;
+      border: 2px solid var(--status-border);
+      border-radius: 12px;
+      font-weight: bold;
+      font-family: 'Fira Mono', 'Consolas', monospace;
+      background-color: var(--status-bg);
+      font-size: 1rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .dot {
+      height: 14px;
+      width: 14px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 0.7rem;
+      box-shadow: 0 0 0 0 rgba(0,0,0,0.0);
+    }
+    .dot.up {
+      background-color: var(--primary);
+      animation: pulseGreen 1.6s infinite;
+      box-shadow: 0 0 8px 0 rgba(45, 206, 137, 0.4);
+    }
+    .dot.down {
+      background-color: var(--danger);
+      animation: pulseRed 1.6s infinite;
+      box-shadow: 0 0 8px 0 rgba(255, 56, 96, 0.4);
+    }
+    @keyframes pulseGreen {
+      0% { box-shadow: 0 0 0 0 rgba(45, 206, 137, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(45, 206, 137, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(45, 206, 137, 0); }
+    }
+    @keyframes pulseRed {
+      0% { box-shadow: 0 0 0 0 rgba(255, 56, 96, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(255, 56, 96, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(255, 56, 96, 0); }
+    }
+    /* Optional: Scrollbar styling for dark mode */
+    ::-webkit-scrollbar {
+      width: 8px;
+      background: #22262f;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #31343c;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Gan-Shmuel Container Dashboard</h1>
+  <table>
+    <tr><th>Container Name</th><th>Status</th></tr>
+    {% for container in containers %}
+    <tr>
+      <td>{{ container.name }}</td>
+      <td>
+        <div class="status-box">
+          {% if container.status == 'running' %}
+            <span class="dot up"></span>Up
+          {% else %}
+            <span class="dot down"></span>Down
+          {% endif %}
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</body>
+</html>

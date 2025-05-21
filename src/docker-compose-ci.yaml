@@ -5,6 +5,7 @@ services:
     privileged: true
     networks:
       - weight-network
+      - weight-network_test
     ports:
       - "8080:8080"
     working_dir: /ci
@@ -20,6 +21,7 @@ services:
       - ../../prod_env:/prod_env  # Production repo
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
+      - TEST_HOST=ci-weight_app_test-1
     env_file:
       - .env
     command: >
@@ -28,8 +30,9 @@ services:
       python3 -m venv venv &&
       source venv/bin/activate &&
       pip install -r requirements.txt &&
-      echo 'Setup complete. Container is idle.' &&
       python3 webhook.py"
+     
 networks:
   weight-network:
     external: true
+  weight-network_test:
