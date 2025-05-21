@@ -7,8 +7,12 @@ from flask import jsonify
 
 from classes_db import Container, Transaction, db
 
-# def check_id():
-
+def id_exists(_id):
+    already_exists = db.session.query(Transaction).filter(Transaction.id==_id).first()
+    ret = False
+    if already_exists is not None:
+        ret = True   
+    return ret
 
 def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_time, id):
     new_transaction = Transaction()
@@ -287,6 +291,8 @@ class truck_direction():
                     already_exists = True
         except KeyError:
             session_id = create_session_id(data['datetime'])
+            if id_exists(session_id):
+                return "ID already exists, can't have two entries at the same second.", 400
         data['unit'], data['weight'] = lb_to_kg(data['unit'], data['weight'])
         data['bruto'] = data['weight']
         new_transaction = create_transaction_from_data_and_session_id(data=data, session_id=session_id)
@@ -319,6 +325,8 @@ class truck_direction():
                 break
         neto = bruto - truck_tara - containers_tara
         id = create_session_id(data['datetime']) #this is also the id - not session id - for out
+        if id_exists(session_id):
+            return "ID already exists, can't have two entries at the same second.", 400
         new_transaction = in_json_and_extras_to_transaciotn(in_json=entrance, truck_tara=truck_tara, neto=neto, exact_time=data['datetime'], id=id)
         db.session.add(new_transaction)
         db.session.commit()
@@ -336,6 +344,8 @@ class truck_direction():
         new_tansaction.containers = [container]
         new_tansaction.neto = new_tansaction.bruto - container_tara
         new_tansaction.id = new_tansaction.session_id = create_session_id(data['datetime'])
+        if id_exists(new_tansaction.id):
+            return "ID already exists, can't have two entries at the same second.", 400
         new_tansaction.direction = 'none'
         new_tansaction.produce = data['produce']
         new_tansaction.truck = 'na'
