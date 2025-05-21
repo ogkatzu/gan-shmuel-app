@@ -108,6 +108,52 @@ def post_truck():
     }), 200
 
 
+@app.route("/truck/<truck_id>", methods=["GET"])
+def get_truck_info(truck_id):
+    """Returns the last known tara and all sessions for a truck, via mock Weight service"""
+    try:
+        item_url = f"http://localhost:5500/mock/item/{truck_id}"  # mocked endpoint
+        res = requests.get(item_url, timeout=5)
+
+        if res.status_code == 404:
+            return jsonify({"error": "Truck not found"}), 404
+        elif res.status_code != 200:
+            return jsonify({"error": "Failed to fetch truck data"}), 502
+
+        data = res.json()
+        return jsonify({
+            "id": data["id"],
+            "tara": data["tara"],
+            "sessions": data["sessions"]
+        }), 200
+    except requests.RequestException as e:
+        return jsonify({"error": "External request failed", "details": str(e)}), 500
+
+
+# ############ mock testing helpers ############## #
+@app.route("/mock/item/<truck_id>")
+def mock_item(truck_id):
+    """Mocked response for GET /item/<id> from Weight service"""
+    return jsonify({
+        "id": truck_id,
+        "tara": 543,
+        "sessions": ["sess-001", "sess-002", "sess-003"]
+    })
+
+
+@app.route("/mock/session/<session_id>")
+def mock_session(session_id):
+    """Mocked response for GET /session/<id> from Weight service"""
+    return jsonify({
+        "id": session_id,
+        "truck": "T-12345",
+        "bruto": 1200,
+        "truckTara": 600,
+        "neto": 600
+    })
+# ###########f mock testing helpers ############## #
+
+
 @app.route('/get_truck', methods=['GET'])
 def get_truck():
     """BONUS (we didnt required to) - historical of all tracks"""
