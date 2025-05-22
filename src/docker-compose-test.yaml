@@ -4,21 +4,22 @@ services:
     build: ../test_env/${BRANCH_NAME}/weight/
     networks:
       - weight-network_test
+      - backend_test
     ports:
       - "5000:5000"
     depends_on:
       weight_db1_test:
         condition: service_healthy
     environment:
-      TEST_HOST: ci-weight_app_test-1
-      MYSQL_DATABASE: weightdb
-      MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_USER: weightuser
-      MYSQL_PASSWORD: weightpass
-      MYSQL_HOST: weight_db1_test  # <-- Changed from weight_db1 to weight_db1_test
+      TEST_HOST: ${WEIGHT_TEST_HOST}
+      MYSQL_DATABASE: ${WEIGHT_MYSQL_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${WEIGHT_MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${WEIGHT_MYSQL_USER}
+      MYSQL_PASSWORD: ${WEIGHT_MYSQL_PASSWORD}
+      MYSQL_HOST: ${WEIGHT_MYSQL_HOST}
     volumes:
       - ${TEST_WEIGHT_PATH_IN}/${BRANCH_NAME}/weight/in:/app/in
-  
+
   weight_db1_test:
     image: mysql:8
     restart: always
@@ -26,69 +27,75 @@ services:
     networks:
       - weight-network_test
     environment:
-      MYSQL_DATABASE: weightdb
-      MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_USER: weightuser
-      MYSQL_PASSWORD: weightpass
+      MYSQL_DATABASE: ${WEIGHT_MYSQL_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${WEIGHT_MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${WEIGHT_MYSQL_USER}
+      MYSQL_PASSWORD: ${WEIGHT_MYSQL_PASSWORD}
     ports:
-      - "3308:3306"
+      - "3307:3306"
     volumes:
       - ../test_env/${BRANCH_NAME}/weight/weightdb.sql:/docker-entrypoint-initdb.d/weightdb.sql
       - ../test_env/${BRANCH_NAME}/weight/db_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-prootpass"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u${WEIGHT_MYSQL_USER}", "-p${WEIGHT_MYSQL_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 20s
 
 
-
-  billing-app:
+  billing-app_test:
     build:
-      context: ./billing/flask-in
+      context: ../test_env/${BRANCH_NAME}/billing/flask-in/
       dockerfile: Dockerfile
     image: billing-app:1.0
-    container_name: billing-app
+#    container_name: billing-app
     working_dir: /app
     environment:
+      WEIGHT_DOCKER_HOST: src-weight_app-1
       MYSQL_HOST: billdb
       MYSQL_USER: root
       MYSQL_PASSWORD: 123456         # ✅ Must match MYSQL_ROOT_PASSWORD from billdb
-      MYSQL_DATABASE: billingdb
+      MYSQL_DATABASE: billdb
     ports:
       - "5500:5500"
     volumes:
-      - ./billing/flask-in/in:/app/in
+      - ${TEST_BILLING_PATH_IN}/${BRANCH_NAME}/billing/flask-in/in:/app/in
     depends_on:
-      - billdb
+      - billdb_test
     networks:
-      - backend
+      - backend_test
+      - billing-network_test
     restart: unless-stopped
 
-  billdb:
+  billdb_test:
     image: mysql:5.7
-    container_name: billdb
+#    container_name: billdb
     environment:
       MYSQL_ROOT_PASSWORD: 123456    # ✅ Must match billing-app's MYSQL_PASSWORD
       MYSQL_DATABASE: billingdb
     ports:
-      - "3306:3306"
+      - "3308:3306"
     volumes:
       - ./billing/billdb:/docker-entrypoint-initdb.d
       - billing-data:/var/lib/mysql
     networks:
-      - backend
+      - billing-network_test
     restart: unless-stopped
 
-  volumes:
-    billing-data:
-    db_data:
 
 
 networks:
-  backend:
+  weight-network_test:
     driver: bridge
     external: true
-  weight-network_test:
+  backend_test:
+    driver: bridge
     external: true
+  billing-network_test:
+    driver: bridge
+    external: true
+
+volumes:
+  db_data:
+  billing-data:

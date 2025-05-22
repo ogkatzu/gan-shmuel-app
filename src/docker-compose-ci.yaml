@@ -32,7 +32,23 @@ services:
       pip install -r requirements.txt &&
       python3 webhook.py"
      
+    #  
+
 networks:
   weight-network:
     external: true
   weight-network_test:
+    driver: bridge
+    external: true
+  billing-network:  
+    driver: bridge
+    external: true
+  billing-network_test:
+    driver: bridge
+    external: true
+  backend:
+    driver: bridge
+    external: true
+  backend_test:
+    driver: bridge
+    external: true
