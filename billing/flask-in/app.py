@@ -185,11 +185,18 @@ def update_truck_provider(id):
 
 @app.route("/truck/<truck_id>", methods=["GET"])
 def get_truck_info(truck_id):
-    """Returns the last known tara and all sessions for a truck, via mock Weight service"""
-    try:
-        item_url = f"http://localhost:5500/mock/item/{truck_id}"  # mocked endpoint
-        res = requests.get(item_url, timeout=5)
+    """Returns the last known tara and all sessions for a truck, via mock Weight service."""
+    # when testing - comment that 2 lines:
+    # if truck_id == "na":
+    #     return jsonify({"error": "Invalid truck ID"}), 400
 
+    item_url = f"http://weight-weight_app-1:5000/item/{truck_id}"
+    
+    # item_url = f"http://weight-weight_app-1:5000/item/na"
+    # hardcoded - for testing
+
+    try:
+        res = requests.get(item_url, timeout=5)
         if res.status_code == 404:
             return jsonify({"error": "Truck not found"}), 404
         elif res.status_code != 200:
@@ -197,12 +204,29 @@ def get_truck_info(truck_id):
 
         data = res.json()
         return jsonify({
-            "id": data["id"],
-            "tara": data["tara"],
-            "sessions": data["sessions"]
+            "id": data.get("id", truck_id),
+            "tara": data.get("tara", "na"),
+            "sessions": data.get("sessions", [])
         }), 200
+
+    except requests.ConnectionError:
+        return jsonify({
+            "error": "Connection error to weight service",
+            "details": f"Could not connect to {item_url}"
+        }), 503
+
+    except requests.Timeout:
+        return jsonify({
+            "error": "Weight service timeout",
+            "details": f"Request to {item_url} timed out"
+        }), 504
+
     except requests.RequestException as e:
-        return jsonify({"error": "External request failed", "details": str(e)}), 500
+        return jsonify({
+            "error": "External request failed",
+            "details": str(e)
+        }), 500
+
 
 
 # ############ mock testing helpers ############## #
