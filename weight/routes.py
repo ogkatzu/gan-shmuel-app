@@ -68,15 +68,18 @@ def register_routes(app):
         if not os.path.exists(filepath):
             return jsonify({'error': 'File not found'}), 400
         added = 0 
+        invalid_weight_field = 0
         try:
             if filename.endswith('.csv'):
-                added = auxillary_functions.handle_csv_in_file(filepath, added)
+                added, invalid_weight_field = auxillary_functions.handle_csv_in_file(filepath, added, invalid_weight_field)
             elif filename.endswith('.json'):
-                added = auxillary_functions.handle_json_in_file(filepath, added)
+                added, invalid_weight_field = auxillary_functions.handle_json_in_file(filepath, added, invalid_weight_field)
             else:
                 return jsonify({'error': 'Unsupported file format'}), 400
             db.session.commit()
-            return jsonify({'status': 'ok', 'added': added})
+            msg =  f"Added {added}."
+            msg_invalid = f"Added {added}, didn't upload {invalid_weight_field} due to invalid weight field."
+            return jsonify({'status': 'ok', 'added': msg if invalid_weight_field == 0 else msg_invalid })
         except Exception as e:
             return jsonify({'error': 'An error occurred', 'details': str(e)}), 500
 
@@ -105,7 +108,7 @@ def register_routes(app):
             try:
                 if tx.containers and tx.containers != "":
                     for cid in json.loads(tx.containers):  
-                        if cid and not Container.query.get(cid):  
+                        if (cid and not Container.query.get(cid)) or not auxillary_functions.container_has_weight_in_table(cid):
                             ids.add(cid)
             except json.JSONDecodeError:
                 print(f"Invalid JSON in tx.containers (tx id {tx.id}):", tx.containers)
@@ -157,7 +160,7 @@ def register_routes(app):
         item_data = auxillary_functions.get_item_data(date_from=from_date, date_to=to_date, id=id)
         
         if item_data is None:
-            return jsonify({"Error": "Item not found within time range."}), 404
+            return jsonify({"error": "Item not found within time range."}), 404
         
         return jsonify(item_data)
 

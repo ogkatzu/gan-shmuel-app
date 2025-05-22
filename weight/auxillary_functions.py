@@ -7,6 +7,13 @@ from flask import jsonify
 
 from classes_db import Container, Transaction, db
 
+def container_has_weight_in_table(container_id):
+    container = Container.query.get(container_id)
+    has_weight = True
+    if container.weight is None or container.weight < 1:
+        has_weight = False
+    return has_weight
+
 def id_exists(_id):
     already_exists = db.session.query(Transaction).filter(Transaction.id==_id).first()
     ret = False
@@ -28,57 +35,59 @@ def in_json_and_extras_to_transaciotn(in_json: json, truck_tara, neto, exact_tim
     new_transaction. truckTara = truck_tara
     return new_transaction
 
-def handle_json_in_file(filepath, added):
+def handle_json_in_file(filepath, added, invalid_weight_field):
     with open(filepath) as jsonfile:
-                    data = json.load(jsonfile)
-                    if not isinstance(data, list):
-                        return jsonify({'error': 'JSON format must be a list'}), 400
-                    for item in data:
-                        cid = item.get('id')
-                        weight = item.get('weight')
-                        unit = item.get('unit', '').lower()
-                        if not cid or weight is None or not unit:
-                            continue
-                        try:
-                            weight = float(weight)
-                        except ValueError:
-                            continue  # Skip invalid weights
-                        existing = Container.query.get(cid)
-                        if existing:
-                            existing.weight = weight
-                            existing.unit = unit
-                        else:
-                            new = Container(container_id=cid, weight=weight, unit=unit)
-                            db.session.add(new)
-                        added += 1
-    return added
+            data = json.load(jsonfile)
+            if not isinstance(data, list):
+                return jsonify({'error': 'JSON format must be a list'}), 400
+            for item in data:
+                cid = item.get('id')
+                weight = item.get('weight')
+                unit = item.get('unit', '').lower()
+                if not cid or weight is None or not unit:
+                    continue
+                try:
+                    weight = float(weight)
+                except ValueError:
+                    invalid_weight_field += 1
+                    continue  # Skip invalid weights
+                existing = Container.query.get(cid)
+                if existing:
+                    existing.weight = weight
+                    existing.unit = unit
+                else:
+                    new = Container(container_id=cid, weight=weight, unit=unit)
+                    db.session.add(new)
+                added += 1
+    return added, invalid_weight_field
 
-def handle_csv_in_file(filepath, added):
+def handle_csv_in_file(filepath, added, invalid_weight_field):
     with open(filepath, newline='') as csvfile:
-                    reader = csv.reader(csvfile)
-                    headers = next(reader, None)  
-                    if not headers or len(headers) < 2:
-                        return jsonify({'error': 'Invalid CSV headers'}), 400
-                    unit = headers[1].lower()  
-                    for row in reader:
-                        if len(row) < 2:
-                            continue  # Skip malformed rows
-                        cid = row[0].strip()
-                        try:
-                            weight = float(row[1])
-                        except ValueError:
-                            continue  # Skip rows with invalid weight
-                        if not cid:
-                            continue  # Skip empty container ID
-                        existing = Container.query.get(cid)
-                        if existing:
-                            existing.weight = weight
-                            existing.unit = unit
-                        else:
-                            new = Container(container_id=cid, weight=weight, unit=unit)
-                            db.session.add(new)
-                        added += 1
-    return added
+            reader = csv.reader(csvfile)
+            headers = next(reader, None)  
+            if not headers or len(headers) < 2:
+                return jsonify({'error': 'Invalid CSV headers'}), 400
+            unit = headers[1].lower()  
+            for row in reader:
+                if len(row) < 2:
+                    continue  # Skip malformed rows
+                cid = row[0].strip()
+                try:
+                    weight = float(row[1])
+                except ValueError:
+                    invalid_weight_field += 1
+                    continue  # Skip rows with invalid weight
+                if not cid:
+                    continue  # Skip empty container ID
+                existing = Container.query.get(cid)
+                if existing:
+                    existing.weight = weight
+                    existing.unit = unit
+                else:
+                    new = Container(container_id=cid, weight=weight, unit=unit)
+                    db.session.add(new)
+                added += 1
+    return added, invalid_weight_field
 
 def get_item_data(date_from, date_to, id):
     default_from = datetime.now().replace(day=1, hour=00, minute=00, second=00, microsecond=00)
@@ -290,16 +299,16 @@ class truck_direction():
             prev_record = json.loads(data['prev_record'])
             if prev_record['direction'] == 'in':
                 if not data['force']:
-                    return 'Two in in a row without an out.', 400
+                    return {'error': 'Two in in a row without an out.'}, 400
                 elif prev_record['truck'] != data['truck']:
-                        return 'Bad Request', 400 # better text, unsure can happen
+                        return {'error': 'Bad Request'}, 400 # better text, unsure can happen
                 else:
                     session_id = prev_record['session_id']
                     already_exists = True
         except KeyError:
             session_id = create_session_id(data['datetime'])
             if id_exists(session_id):
-                return "ID already exists, can't have two entries at the same second.", 400
+                return {'error': "ID already exists, can't have two entries at the same second."}, 400
         data['unit'], data['weight'] = lb_to_kg(data['unit'], data['weight'])
         data['bruto'] = data['weight']
         new_transaction = create_transaction_from_data_and_session_id(data=data, session_id=session_id)
@@ -315,9 +324,9 @@ class truck_direction():
             return "No in for this out", 400
         if entrance['direction'] == 'out':
             if not data['force']:
-                    return 'Two outs is a row without force', 400
+                    return {'error': 'Two outs is a row without force'}, 400
             elif entrance['truck'] != data['truck']:
-                return 'Bad Request', 400 # better text
+                return {'error': 'Bad Request'}, 400 # better text
         bruto = entrance['bruto']
         truck_tara = data['weight']
         containers_tara = 0
@@ -336,7 +345,7 @@ class truck_direction():
             neto = bruto - truck_tara - containers_tara
         _id = create_session_id(data['datetime']) #this is also the id - not session id - for out
         if id_exists(_id):
-            return "ID already exists, can't have two entries at the same second.", 400
+            return {'error': "ID already exists, can't have two entries at the same second."}, 400
         new_transaction = in_json_and_extras_to_transaciotn(in_json=entrance, truck_tara=truck_tara, neto=neto, exact_time=data['datetime'], id=_id)
         db.session.add(new_transaction)
         db.session.commit()
@@ -348,14 +357,16 @@ class truck_direction():
         new_tansaction = Transaction()
         new_tansaction.bruto = data['weight']
         container_id = data['containers'][0] # אthis implementation of none only accepts single container
-        container = containers = db.session.query(Container).filter_by(container_id=container_id).first()
+        container = db.session.query(Container).filter_by(container_id=container_id).first()
+        if not container or not container_has_weight_in_table(container_id=container_id):
+            return {"error": "Container is not in container database, cannot calculate neto."}, 404
         unit, container_tara = lb_to_kg(container.unit ,container.weight)
         new_tansaction.truckTara = container_tara #should this be the case?
         new_tansaction.containers = [container]
         new_tansaction.neto = new_tansaction.bruto - container_tara
         new_tansaction.id = new_tansaction.session_id = create_session_id(data['datetime'])
         if id_exists(new_tansaction.id):
-            return "ID already exists, can't have two entries at the same second.", 400
+            return {'error': "ID already exists, can't have two entries at the same second."}, 400
         new_tansaction.direction = 'none'
         new_tansaction.produce = data['produce']
         new_tansaction.truck = 'na'
