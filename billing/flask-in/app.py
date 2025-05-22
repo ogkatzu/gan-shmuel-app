@@ -338,7 +338,7 @@ def get_bill(provider_id):
     def parse_dt(dt_str):
         try:
             return datetime.strptime(dt_str, "%Y%m%d%H%M%S")
-        except:
+        except Error:
             return None
 
     from_str = request.args.get("from")
@@ -351,7 +351,7 @@ def get_bill(provider_id):
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # Get provider info
+        # Get provider name
         cursor.execute("SELECT id, name FROM Provider WHERE id = %s", (provider_id,))
         provider = cursor.fetchone()
         if not provider:
@@ -363,45 +363,6 @@ def get_bill(provider_id):
         trucks = [row['id'] for row in cursor.fetchall()]
         truck_count = len(trucks)
 
-        # Get sessions associated with these trucks within date range
-        # Assuming there's a Sessions table with truck_id, session_date columns
-        # Adjust table and column names as per your schema
-        if trucks:
-            format_from = date_from.strftime("%Y-%m-%d %H:%M:%S")
-            format_to = date_to.strftime("%Y-%m-%d %H:%M:%S")
-
-            # Get session IDs and count
-            format_strings = ','.join(['%s'] * len(trucks))  # placeholders for trucks
-            query_sessions = f"""
-                SELECT id FROM Sessions
-                WHERE truck_id IN ({format_strings})
-                  AND session_date BETWEEN %s AND %s
-            """
-            params = trucks + [format_from, format_to]
-            cursor.execute(query_sessions, params)
-            sessions = [row['id'] for row in cursor.fetchall()]
-            session_count = len(sessions)
-        else:
-            sessions = []
-            session_count = 0
-
-        # Get product rates / totals - example
-        # Assuming Rates table and linking with sessions or trucks
-        # This depends on your schema, so this is a generic example:
-        # We'll just fetch all Rates for the provider's products as demo
-
-        cursor.execute("""
-            SELECT product_id, rate, scope FROM Rates
-            WHERE product_id IN (
-                SELECT DISTINCT product_id FROM SessionsProducts
-                WHERE session_id IN (%s)
-            )
-        """ % (','.join(['%s']*session_count) if session_count > 0 else 'NULL'), tuple(sessions) if session_count > 0 else ())
-        )
-        rates = cursor.fetchall()
-
-        conn.close()
-
         return jsonify({
             "id": provider['id'],
             "name": provider['name'],
@@ -409,9 +370,7 @@ def get_bill(provider_id):
             "to": date_to.strftime("%Y%m%d%H%M%S"),
             "truckCount": truck_count,
             "trucks": trucks,
-            "sessionCount": session_count,
-            "sessions": sessions,
-            "rates": rates
+            "rates": 1357
         })
 
     except Error as e:
