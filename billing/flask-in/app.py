@@ -14,11 +14,11 @@ app = Flask(__name__)
 XL_DB_IN = "./in/rates.xlsx"
 XL_DB_OUT = os.path.join(os.getcwd(), 'temp_rates.xlsx')
 
-# ready Macros still not in use:
-# DB_IN = "db/in/"
-# DB_OUT = "db/out/"
-# APP_IN_NETWORK = "flask/in/"  # will use for network between docker
-# APP_OUT_NETWORK = "flask/out/"
+# Weight service URL configuration
+WEIGHT_URL = f"http://{os.environ.get('WEIGHT_DOCKER_HOST', 'localhost')}:5000"
+
+# Global variable for mock mode
+MOCK_WEIGHT_MODE = False
 
 # ########## helper methods ########### #
 @app.route('/get_truck', methods=['GET'])
@@ -34,6 +34,142 @@ def get_truck():
         'Scope': scope,
         'message': 'GET request received'
     })
+
+
+def get_date_range():
+    """Parse date range from query parameters or use defaults"""
+    now = datetime.now()
+    default_from = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    default_to = now
+
+    from_str = request.args.get("from") or default_from.strftime("%Y%m%d%H%M%S")
+    to_str = request.args.get("to") or default_to.strftime("%Y%m%d%H%M%S")
+    return from_str, to_str
+
+
+def get_trucks_for_provider(provider_id):
+    """Get all trucks for a given provider"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM Trucks WHERE provider_id = %s", (provider_id,))
+        trucks = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return trucks
+    except Error:
+        return []
+
+
+def get_sessions_for_truck(truck_id, from_str, to_str):
+    """Get session IDs for a truck from Weight service"""
+    try:
+        resp = requests.get(
+            f"{WEIGHT_URL}/item/{truck_id}",
+            params={"from": from_str, "to": to_str},
+            timeout=5
+        )
+        if resp.status_code == 200:
+            return resp.json().get("sessions", [])
+    except Exception:
+        pass
+    return []
+
+
+def get_sessions_for_truck_mock(truck_id, from_str, to_str):
+    """Mock version that returns test sessions"""
+    if MOCK_WEIGHT_MODE:
+        return ["sess-001", "sess-002", "sess-003"]
+    else:
+        return get_sessions_for_truck(truck_id, from_str, to_str)
+
+
+def get_valid_out_session_data(session_id):
+    """Get session data from Weight service for billing calculation"""
+    try:
+        resp = requests.get(f"{WEIGHT_URL}/session/{session_id}", timeout=5)
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        # Only process 'out' sessions with valid neto values
+        if "truckTara" in data and data.get("neto") not in [None, "na"]:
+            return {
+                "produce": data.get("produce"),
+                "neto": int(data["neto"])
+            }
+    except Exception:
+        pass
+    return None
+
+
+def get_valid_out_session_data_mock(session_id):
+    """Mock version that returns test session data"""
+    if MOCK_WEIGHT_MODE:
+        mock_sessions = {
+            "sess-001": {"produce": "orange", "neto": 500},
+            "sess-002": {"produce": "apple", "neto": 300}, 
+            "sess-003": {"produce": "tomato", "neto": 400}
+        }
+        return mock_sessions.get(session_id, None)
+    else:
+        return get_valid_out_session_data(session_id)
+
+
+def get_rate_for_product(product, provider_id):
+    """Get rate for a product, checking provider-specific first, then ALL"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # First try specific provider
+        cursor.execute("SELECT rate FROM Rates WHERE product_id = %s AND scope = %s", 
+                      (product, str(provider_id)))
+        result = cursor.fetchone()
+        
+        if not result:
+            # Then try ALL
+            cursor.execute("SELECT rate FROM Rates WHERE product_id = %s AND scope = %s", 
+                          (product, "ALL"))
+            result = cursor.fetchone()
+        
+        conn.close()
+        return result[0] if result else "unknown"
+    except Error:
+        return "unknown"
+
+
+def aggregate_product_stats(session_data_list, provider_id):
+    """Aggregate product statistics for billing"""
+    product_stats = {}
+    total_pay = 0
+    session_count = 0
+
+    for entry in session_data_list:
+        product = entry["produce"]
+        neto = entry["neto"]
+        rate = get_rate_for_product(product, provider_id)
+        
+        pay = rate * neto if isinstance(rate, int) else "unknown"
+
+        if product not in product_stats:
+            product_stats[product] = {
+                "product": product,
+                "count": 0,
+                "amount": 0,
+                "rate": rate,
+                "pay": 0 if isinstance(rate, int) else "unknown"
+            }
+
+        product_stats[product]["count"] += 1
+        product_stats[product]["amount"] += neto
+
+        if isinstance(pay, int):
+            product_stats[product]["pay"] += pay
+            total_pay += pay
+
+        session_count += 1
+
+    return list(product_stats.values()), session_count, total_pay
+
 # #########f helper methods ########### #
 
 
@@ -231,7 +367,6 @@ def get_truck_info(truck_id):
         }), 500
 
 
-
 # ############ mock testing helpers ############## #
 @app.route("/mock/item/<truck_id>")
 def mock_item(truck_id):
@@ -253,6 +388,62 @@ def mock_session(session_id):
         "truckTara": 600,
         "neto": 600
     })
+
+
+@app.route("/test-setup", methods=["POST"])
+def setup_test_data():
+    """Setup test data for billing demonstration"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Insert test rates
+        test_rates = [
+            ("orange", 15, "ALL"),
+            ("apple", 12, "ALL"), 
+            ("tomato", 18, "10001"),
+            ("banana", 10, "ALL")
+        ]
+        
+        # Clear existing rates and insert test rates
+        cursor.execute("DELETE FROM Rates")
+        for product, rate, scope in test_rates:
+            cursor.execute("INSERT INTO Rates (product_id, rate, scope) VALUES (%s, %s, %s)", 
+                          (product, rate, scope))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            "message": "Test data setup complete",
+            "rates_added": len(test_rates)
+        }), 200
+        
+    except Error as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/mock-weight-mode", methods=["POST"])
+def enable_mock_weight_mode():
+    """Enable mock mode for Weight service calls"""
+    global MOCK_WEIGHT_MODE
+    MOCK_WEIGHT_MODE = True
+    return jsonify({"message": "Mock Weight mode enabled"}), 200
+
+
+@app.route("/mock-weight-mode", methods=["DELETE"])
+def disable_mock_weight_mode():
+    """Disable mock mode for Weight service calls"""
+    global MOCK_WEIGHT_MODE
+    MOCK_WEIGHT_MODE = False
+    return jsonify({"message": "Mock Weight mode disabled"}), 200
+
+
+@app.route("/mock-status", methods=["GET"])
+def get_mock_status():
+    """Get current mock mode status"""
+    return jsonify({"mock_mode": MOCK_WEIGHT_MODE}), 200
+
 # ###########f mock testing helpers ############## #
 
 
@@ -274,6 +465,9 @@ def load_rates():
         conn = get_db_connection()
         cursor = conn.cursor()
 
+        # Clear existing rates
+        cursor.execute("DELETE FROM Rates")
+
         for _, row in df.iterrows():
             cursor.execute("""
                 INSERT INTO Rates (product_id, rate, scope)
@@ -288,7 +482,6 @@ def load_rates():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 
 @app.route('/rates', methods=['GET'])
@@ -330,91 +523,89 @@ def export_to_excel():
 
 @app.route('/bill/<int:provider_id>', methods=['GET'])
 def get_bill(provider_id):
-    # Parse optional from/to query params (format: YYYYMMDDHHMMSS)
-    now = datetime.now()
-    default_from = datetime(now.year, now.month, 1, 0, 0, 0)
-    default_to = now
-
-    def parse_dt(dt_str):
-        try:
-            return datetime.strptime(dt_str, "%Y%m%d%H%M%S")
-        except:
-            return None
-
-    from_str = request.args.get("from")
-    to_str = request.args.get("to")
-
-    date_from = parse_dt(from_str) or default_from
-    date_to = parse_dt(to_str) or default_to
-
+    """Generate billing report for a provider (with mock support)"""
     try:
+        # Check if provider exists
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-
-        # Get provider info
+        cursor = conn.cursor()
         cursor.execute("SELECT id, name FROM Provider WHERE id = %s", (provider_id,))
         provider = cursor.fetchone()
-        if not provider:
-            conn.close()
-            return jsonify({"error": f"Provider ID {provider_id} not found"}), 404
-
-        # Get trucks for provider
-        cursor.execute("SELECT id FROM Trucks WHERE provider_id = %s", (provider_id,))
-        trucks = [row['id'] for row in cursor.fetchall()]
-        truck_count = len(trucks)
-
-        # Get sessions associated with these trucks within date range
-        # Assuming there's a Sessions table with truck_id, session_date columns
-        # Adjust table and column names as per your schema
-        if trucks:
-            format_from = date_from.strftime("%Y-%m-%d %H:%M:%S")
-            format_to = date_to.strftime("%Y-%m-%d %H:%M:%S")
-
-            # Get session IDs and count
-            format_strings = ','.join(['%s'] * len(trucks))  # placeholders for trucks
-            query_sessions = f"""
-                SELECT id FROM Sessions
-                WHERE truck_id IN ({format_strings})
-                  AND session_date BETWEEN %s AND %s
-            """
-            params = trucks + [format_from, format_to]
-            cursor.execute(query_sessions, params)
-            sessions = [row['id'] for row in cursor.fetchall()]
-            session_count = len(sessions)
-        else:
-            sessions = []
-            session_count = 0
-
-        # Get product rates / totals - example
-        # Assuming Rates table and linking with sessions or trucks
-        # This depends on your schema, so this is a generic example:
-        # We'll just fetch all Rates for the provider's products as demo
-
-        cursor.execute("""
-            SELECT product_id, rate, scope FROM Rates
-            WHERE product_id IN (
-                SELECT DISTINCT product_id FROM SessionsProducts
-                WHERE session_id IN (%s)
-            )
-        """ % (','.join(['%s']*session_count) if session_count > 0 else 'NULL'), tuple(sessions) if session_count > 0 else ())
-        )
-        rates = cursor.fetchall()
-
         conn.close()
+        
+        if not provider:
+            return jsonify({"error": "Provider not found"}), 404
 
-        return jsonify({
-            "id": provider['id'],
-            "name": provider['name'],
-            "from": date_from.strftime("%Y%m%d%H%M%S"),
-            "to": date_to.strftime("%Y%m%d%H%M%S"),
-            "truckCount": truck_count,
-            "trucks": trucks,
+        from_str, to_str = get_date_range()
+        trucks = get_trucks_for_provider(provider_id)
+        truck_ids = trucks
+
+        used_trucks = set()
+        all_sessions_data = []
+
+        for truck_id in truck_ids:
+            # Use mock or real function based on mode
+            if MOCK_WEIGHT_MODE:
+                session_ids = get_sessions_for_truck_mock(truck_id, from_str, to_str)
+            else:
+                session_ids = get_sessions_for_truck(truck_id, from_str, to_str)
+                
+            if session_ids:
+                used_trucks.add(truck_id)
+
+            for sid in session_ids:
+                if MOCK_WEIGHT_MODE:
+                    session_data = get_valid_out_session_data_mock(sid)
+                else:
+                    session_data = get_valid_out_session_data(sid)
+                    
+                if session_data:
+                    all_sessions_data.append(session_data)
+
+        products, session_count, total_pay = aggregate_product_stats(all_sessions_data, provider_id)
+
+        result = {
+            "id": provider[0],
+            "name": provider[1],
+            "from": from_str,
+            "to": to_str,
+            "truckCount": len(used_trucks),
             "sessionCount": session_count,
-            "sessions": sessions,
-            "rates": rates
-        })
+            "products": products,
+            "total": total_pay,
+            "mock_mode": MOCK_WEIGHT_MODE
+        }
+
+        return jsonify(result), 200
 
     except Error as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/test-full-billing", methods=["GET"])
+def test_full_billing():
+    """Complete test of billing system with mock data"""
+    try:
+        # Setup test data
+        setup_response = setup_test_data()
+        if setup_response[1] != 200:
+            return setup_response
+            
+        # Enable mock mode
+        global MOCK_WEIGHT_MODE
+        MOCK_WEIGHT_MODE = True
+        
+        # Test billing for provider 10001
+        provider_id = 10001
+        bill_response = get_bill(provider_id)
+        
+        return jsonify({
+            "test_status": "completed",
+            "setup": "success",
+            "mock_mode": "enabled",
+            "bill_data": bill_response[0].get_json() if hasattr(bill_response[0], 'get_json') else bill_response[0]
+        }), 200
+        
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
