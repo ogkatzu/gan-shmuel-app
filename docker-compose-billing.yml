@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  billing-app:
+    build:
+      context: ./billing/flask-in
+      dockerfile: Dockerfile
+    image: billing-app:1.0
+    container_name: billing-app
+    working_dir: /app
+    env_file: .env
+    ports:
+      - "5500:5500"
+    volumes:
+      - ./billing/flask-in/in:/app/in  # Bind mount for the "in" directory
+    depends_on:
+      - billdb
+    networks:
+      - backend
+    restart: unless-stopped
+
+  billdb:
+    image: mysql:5.7
+    container_name: billdb
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    volumes:
+      - ./billing/billdb:/docker-entrypoint-initdb.d
+      - billing-data:/var/lib/mysql
+    networks:
+      - backend
+    restart: unless-stopped
+
+# Named volume for MySQL data persistence only
+volumes:
+  billing-data:    # MySQL database files
+
+networks:
+  backend:
+    driver: bridge

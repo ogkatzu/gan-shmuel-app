@@ -21,7 +21,12 @@ __pycache__/
 *.log
 *.pid
 *.tmp
+<<<<<<< HEAD
+*.orig
+*.rej
+=======
 in/
+>>>>>>> main
 
 # Secrets and certificates
 *.key
@@ -30,6 +35,8 @@ cert.*
 key.*
 container-resources/**/secret/
 container-resources/**/nginx/cert/
+secret/
+nginx/cert/
 
 # Editor / IDE configs
 .idea/
