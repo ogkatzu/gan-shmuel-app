@@ -397,7 +397,6 @@ def get_bill(provider_id):
                 WHERE session_id IN (%s)
             )
         """ % (','.join(['%s']*session_count) if session_count > 0 else 'NULL'), tuple(sessions) if session_count > 0 else ())
-        )
         rates = cursor.fetchall()
 
         conn.close()
