@@ -1,0 +1,80 @@
+version: "3.8"
+
+services:
+  # Weight Service
+  weight_app:
+    build: 
+      context: ./weight
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    depends_on:
+      weight_db:
+        condition: service_healthy
+    volumes:
+      - ./weight/in:/app/in
+    env_file:
+      - ./weight/.env
+    networks:
+      - integration_network
+
+  weight_db:
+    image: mysql:8
+    restart: always
+    environment:
+      MYSQL_DATABASE: weightdb
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_USER: weightuser
+      MYSQL_PASSWORD: weightpass
+    volumes:
+      - ./weight/weightdb.sql:/docker-entrypoint-initdb.d/weightdb.sql
+      - weight_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    networks:
+      - integration_network
+
+  # Billing Service
+  billing_app:
+    build:
+      context: ./billing/flask-in
+      dockerfile: Dockerfile
+    ports:
+      - "5500:5500"
+    volumes:
+      - ./billing/flask-in:/app
+      - ./billing/flask-in/in:/app/in
+    depends_on:
+      - billing_db
+      - weight_app
+    environment:
+      MYSQL_HOST: billing_db
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      MYSQL_DATABASE: billdb
+      WEIGHT_DOCKER_HOST: weight_app
+    networks:
+      - integration_network
+
+  billing_db:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: billdb
+    volumes:
+      - ./billing/billdb:/docker-entrypoint-initdb.d
+      - billing_db_data:/var/lib/mysql
+    networks:
+      - integration_network
+
+networks:
+  integration_network:
+    driver: bridge
+
+volumes:
+  weight_db_data:
+  billing_db_data:

@@ -17,9 +17,6 @@ XL_DB_OUT = os.path.join(os.getcwd(), 'temp_rates.xlsx')
 # Weight service URL configuration
 WEIGHT_URL = f"http://{os.environ.get('WEIGHT_DOCKER_HOST', 'localhost')}:5000"
 
-# Global variable for mock mode
-MOCK_WEIGHT_MODE = False
-
 # ########## helper methods ########### #
 @app.route('/get_truck', methods=['GET'])
 def get_truck():
@@ -75,14 +72,6 @@ def get_sessions_for_truck(truck_id, from_str, to_str):
     return []
 
 
-def get_sessions_for_truck_mock(truck_id, from_str, to_str):
-    """Mock version that returns test sessions"""
-    if MOCK_WEIGHT_MODE:
-        return ["sess-001", "sess-002", "sess-003"]
-    else:
-        return get_sessions_for_truck(truck_id, from_str, to_str)
-
-
 def get_valid_out_session_data(session_id):
     """Get session data from Weight service for billing calculation"""
     try:
@@ -99,19 +88,6 @@ def get_valid_out_session_data(session_id):
     except Exception:
         pass
     return None
-
-
-def get_valid_out_session_data_mock(session_id):
-    """Mock version that returns test session data"""
-    if MOCK_WEIGHT_MODE:
-        mock_sessions = {
-            "sess-001": {"produce": "orange", "neto": 500},
-            "sess-002": {"produce": "apple", "neto": 300}, 
-            "sess-003": {"produce": "tomato", "neto": 400}
-        }
-        return mock_sessions.get(session_id, None)
-    else:
-        return get_valid_out_session_data(session_id)
 
 
 def get_rate_for_product(product, provider_id):
@@ -388,62 +364,6 @@ def mock_session(session_id):
         "truckTara": 600,
         "neto": 600
     })
-
-
-@app.route("/test-setup", methods=["POST"])
-def setup_test_data():
-    """Setup test data for billing demonstration"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Insert test rates
-        test_rates = [
-            ("orange", 15, "ALL"),
-            ("apple", 12, "ALL"), 
-            ("tomato", 18, "10001"),
-            ("banana", 10, "ALL")
-        ]
-        
-        # Clear existing rates and insert test rates
-        cursor.execute("DELETE FROM Rates")
-        for product, rate, scope in test_rates:
-            cursor.execute("INSERT INTO Rates (product_id, rate, scope) VALUES (%s, %s, %s)", 
-                          (product, rate, scope))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            "message": "Test data setup complete",
-            "rates_added": len(test_rates)
-        }), 200
-        
-    except Error as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/mock-weight-mode", methods=["POST"])
-def enable_mock_weight_mode():
-    """Enable mock mode for Weight service calls"""
-    global MOCK_WEIGHT_MODE
-    MOCK_WEIGHT_MODE = True
-    return jsonify({"message": "Mock Weight mode enabled"}), 200
-
-
-@app.route("/mock-weight-mode", methods=["DELETE"])
-def disable_mock_weight_mode():
-    """Disable mock mode for Weight service calls"""
-    global MOCK_WEIGHT_MODE
-    MOCK_WEIGHT_MODE = False
-    return jsonify({"message": "Mock Weight mode disabled"}), 200
-
-
-@app.route("/mock-status", methods=["GET"])
-def get_mock_status():
-    """Get current mock mode status"""
-    return jsonify({"mock_mode": MOCK_WEIGHT_MODE}), 200
-
 # ###########f mock testing helpers ############## #
 
 
@@ -523,7 +443,7 @@ def export_to_excel():
 
 @app.route('/bill/<int:provider_id>', methods=['GET'])
 def get_bill(provider_id):
-    """Generate billing report for a provider (with mock support)"""
+    """Generate billing report for a provider"""
     try:
         # Check if provider exists
         conn = get_db_connection()
@@ -543,21 +463,12 @@ def get_bill(provider_id):
         all_sessions_data = []
 
         for truck_id in truck_ids:
-            # Use mock or real function based on mode
-            if MOCK_WEIGHT_MODE:
-                session_ids = get_sessions_for_truck_mock(truck_id, from_str, to_str)
-            else:
-                session_ids = get_sessions_for_truck(truck_id, from_str, to_str)
-                
+            session_ids = get_sessions_for_truck(truck_id, from_str, to_str)
             if session_ids:
                 used_trucks.add(truck_id)
 
             for sid in session_ids:
-                if MOCK_WEIGHT_MODE:
-                    session_data = get_valid_out_session_data_mock(sid)
-                else:
-                    session_data = get_valid_out_session_data(sid)
-                    
+                session_data = get_valid_out_session_data(sid)
                 if session_data:
                     all_sessions_data.append(session_data)
 
@@ -571,41 +482,12 @@ def get_bill(provider_id):
             "truckCount": len(used_trucks),
             "sessionCount": session_count,
             "products": products,
-            "total": total_pay,
-            "mock_mode": MOCK_WEIGHT_MODE
+            "total": total_pay
         }
 
         return jsonify(result), 200
 
     except Error as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/test-full-billing", methods=["GET"])
-def test_full_billing():
-    """Complete test of billing system with mock data"""
-    try:
-        # Setup test data
-        setup_response = setup_test_data()
-        if setup_response[1] != 200:
-            return setup_response
-            
-        # Enable mock mode
-        global MOCK_WEIGHT_MODE
-        MOCK_WEIGHT_MODE = True
-        
-        # Test billing for provider 10001
-        provider_id = 10001
-        bill_response = get_bill(provider_id)
-        
-        return jsonify({
-            "test_status": "completed",
-            "setup": "success",
-            "mock_mode": "enabled",
-            "bill_data": bill_response[0].get_json() if hasattr(bill_response[0], 'get_json') else bill_response[0]
-        }), 200
-        
-    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
