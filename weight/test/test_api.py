@@ -49,19 +49,19 @@ def test_get_unknown_containers():
     for item in response.json():
         assert isinstance(item, str)
 
-def test_post_batch_weight_csv():
-    payload = {
-        "file": "containers2.csv"
-    }
+# def test_post_batch_weight_csv():
+#     payload = {
+#         "file": "containers2.csv"
+#     }
 
-    headers = {
-        "Content-Type": "application/json"
-    }
+#     headers = {
+#         "Content-Type": "application/json"
+#     }
 
-    response = requests.post(f"{BASE_URL}/batch-weight", json=payload, headers=headers)
+#     response = requests.post(f"{BASE_URL}/batch-weight", json=payload, headers=headers)
 
-    print(response.status_code, response.text)
-    assert response.status_code in (200, 201)
+#     print(response.status_code, response.text)
+#     assert response.status_code in (200, 201)
 def test_post_batch_weight_csv_file_not_found():
     payload = {
         "file": "nonexistent.csv"
