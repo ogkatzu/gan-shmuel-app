@@ -190,8 +190,11 @@ def get_truck_info(truck_id):
     # if truck_id == "na":
     #     return jsonify({"error": "Invalid truck ID"}), 400
 
-    item_url = f"http://weight-weight_app-1:5000/item/{truck_id}"
-    
+    # item_url = f"http://weight-weight_app-1:5000/item/{truck_id}"
+
+    host_weight=os.environ.get('WEIGHT_DOCKER_HOST','localhost')
+    item_url = f"http://{host_weight}:5000/item/{truck_id}"
+
     # item_url = f"http://weight-weight_app-1:5000/item/na"
     # hardcoded - for testing
 
